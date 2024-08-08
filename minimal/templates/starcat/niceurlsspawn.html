@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block metatags %}
+<title>Run | starCAT</title>
+<meta name="description" content="Run starCAT">
+{% endblock %}
+
+{% block contents %}
+<div class="container">
+    <div>
+        <ol class="breadcrumb small">
+            <li class="breadcrumb-item"><a href="{{url_for('bl_home.index')}}">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Run starCAT</li>
+        </ol>
+    </div>
+
+
+    <h1>Run starCAT on the web.</h1>
+    <p class="lead">Upload your data in .h5ad format. Please ensure the file size is less than 2 GB.<br></p>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul>
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    <form action="{{ url_for('bl_starcat.runstarcat') }}" method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" value="Upload">
+    </form>
+
+</div>
+{% endblock %}

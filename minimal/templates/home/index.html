@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block metatags %}
+<title>starCAT</title>
+<meta name="description" content="starCAT">
+{% endblock %}
+
+{% block contents %}
+<div class="container">
+    <h1 style="margin-top:37px;">About starCAT</h1>
+    <p class="lead">starCAT is an algorithm to annotate single-cell transcriptomes with pre-defined catalogs of reference<br>
+        gene expression programs (GEPs). Read more about starCAT in our <a href="https://www.biorxiv.org/content/10.1101/2024.05.03.592310v1">preprint</a>.</p>
+
+    <p class="lead">This website hosts reference GEP catalogs created by ourselves and others. Learn about and download<br>available reference catalogs <a href="{{url_for('bl_references.refspawn')}}">here</a> </p>
+
+    <p class="lead">For datasets less than 2GB in memory, you can upload your data to run starCAT directly <a href="{{url_for('bl_starcat.runstarcat')}}">here</a></p>    
+
+    <p class="lead">For larger datasets, please download our <a href="https://github.com/immunogenomics/starCAT">software from github</a> to run starCAT locally.</p>
+
+</div>
+{% endblock %}
