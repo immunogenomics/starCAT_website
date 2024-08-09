@@ -4,5 +4,5 @@ import os
 os.environ["SESSION_SECRET"]="MySessionSecret" 
 
 app = create_app()
-app.config['UPLOAD_FOLDER'] = './uploads'
+app.config['UPLOAD_FOLDER'] = './minimal/uploads'
 app.run(port=8001)

@@ -4,6 +4,7 @@ from flask import (
 from .layoutUtils import *
 from .auth import *
 
+
 bp = Blueprint('bl_starcat', __name__, url_prefix='/starcat')
 
 @bp.route('/',methods=('GET', 'POST'))
@@ -14,10 +15,8 @@ def runstarcat():
     page_title_for_id = "This is a title that will end up in the page url"
     if request.method == 'POST':
         file = request.files['file']
-        print(file)
         if file:
             file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename)
-            print(file_path)
             file.save(file_path)
             # Run the processing script on the uploaded file
             #result = process_data(file_path)
