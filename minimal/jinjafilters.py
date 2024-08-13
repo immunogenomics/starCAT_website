@@ -19,7 +19,10 @@ def displayError(errNum):
 
 msgDict = { 
     "Msg1": "<p>This is a <b>nice</b> message, the first of the list</p>",
-    "Msg2": "<p>This is an even <b>nicer</b> message.</p>"
+    "Msg2": "<p>This is an even <b>nicer</b> message.</p>",
+    'select_ref_message' : '<p>Please first submit a reference catalog selection and upload again.</p>',
+    # 'processing_message' : '<p>Your data is processing.</p>',
+    
 }
 
 def displayMessage(msgKey):
