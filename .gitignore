@@ -16,3 +16,4 @@ build/
 .vscode/
 *.dump
 main-private.py
+uploads/
