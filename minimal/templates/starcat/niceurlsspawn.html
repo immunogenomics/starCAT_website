@@ -15,32 +15,34 @@
     </div>
 
     <p class="lead">Select a starCAT reference catalog.<br></p>
-
     <div class="dropdown">
-        <button class="dropbtn">Reference</button>
-        <div class="dropdown-content">
-            <a href="#">Link 1</a>
-            <a href="#">Link 2</a>
-            <a href="#">Link 3</a>
-        </div>
-    </div>
+        <form action="{{ url_for('bl_starcat.chooseref') }}" method="post">
+            <div>
+                <select class="form-control" name="ref" id="ref">
+                    {% for ref in references %}
+                    <option value="{{ ref }}" {% if ref == selected_ref %}selected{% endif %}>
+                        {{ ref }}
+                    </option>
+                    {% endfor %}
+    
+             </select>
+            </div>
+            <button type="submit" class="btn-primary">Submit</button>
+        </form>
+    </div>    
 
     </p>
     <p class="lead">Upload your data in .h5ad format. Please ensure the file size is less than 2 GB.<br></p>
 
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul>
-          {% for message in messages %}
-            <li>{{ message }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
     <form action="{{ url_for('bl_starcat.runstarcat') }}" method="post" enctype="multipart/form-data">
         <input type="file" name="file">
         <input type="submit" value="Upload">
     </form>
+
+
+
+
+
 
 </div>
 {% endblock %}
