@@ -39,7 +39,7 @@ def runstarcat():
             else:
                 flash("select_ref_message") 
 
-    return render_template('starcat/niceurlsspawn.html', mc=mc, 
+    return render_template('starcat/starcatpage.html', mc=mc, 
         page_title=page_title, page_title_for_id=page_title_for_id, references=session.get('references'), selected_ref = session.get('selected_ref'))
 
 
