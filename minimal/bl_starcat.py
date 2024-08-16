@@ -18,8 +18,6 @@ bp = Blueprint('bl_starcat', __name__, url_prefix='/starcat')
 def runstarcat():
     mc = set_menu("starcat")
     set_session()
-    page_title = "This is a title that will end up in the page url"
-    page_title_for_id = "This is a title that will end up in the page url"
 
     print(session.get('selected_ref', 'none'))
 
@@ -39,8 +37,8 @@ def runstarcat():
             else:
                 flash("select_ref_message") 
 
-    return render_template('starcat/starcatpage.html', mc=mc, 
-        page_title=page_title, page_title_for_id=page_title_for_id, references=session.get('references'), selected_ref = session.get('selected_ref'))
+    return render_template('starcat/starcatpage.html', mc=mc, references=session.get('references'),
+                            selected_ref = session.get('selected_ref'))
 
 
 @bp.route('/set-session', methods=['POST'])
