@@ -23,7 +23,10 @@ msgDict = {
     # 'select_ref_message' : '<p>Please first submit a reference catalog selection and upload again.</p>',
     'Invalid email or password. Please check they are entered correctly and make sure you have already registered.' : 
         '<p>Invalid email or password. Please check they are entered correctly and make sure you have already registered.</p>',
-    'Your account has been created! You can now log in.' : '<p>Your account has been created! You can now log in.</p>',
+    'Your account has been created! You can now run starCAT.' : 
+        '<p>Your account has been created! You can now run starCAT.</p>',
+    'This email is already registered. Please choose a different one.' :
+        '<p>This email is already registered. Please choose a different one.</p>',
     'File Type Error' : '<p>File Type Error. Please upload an ".h5ad" type file.</p>',
     'File Size Error' : '<p>File Size Error. Please upload a smaller file (<2 GB) or refer to our <a href="https://github.com/immunogenomics/starCAT" target="_blank">'
             'GitHub repository</a>  process larger datasets.</p>'
