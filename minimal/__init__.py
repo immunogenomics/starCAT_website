@@ -1,15 +1,13 @@
 import os
-
 from flask import Flask
 from .jinjafilters import *
 from .errorhandlers import *
+from .config import Config
 
 def create_app():
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
-    app.config.from_mapping(
-        SECRET_KEY=os.environ['SESSION_SECRET'],
-    )
+    app.config.from_object(Config)
 
     from . import bl_home
     app.register_blueprint(bl_home.bp)
