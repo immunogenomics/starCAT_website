@@ -3,17 +3,16 @@ from flask import Flask
 from .jinjafilters import *
 from .errorhandlers import *
 from .config import Config
+from .user_model import db
 
 def create_app():
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
+    db.init_app(app)
 
     from . import bl_home
     app.register_blueprint(bl_home.bp)
-
-    from . import bl_modals
-    app.register_blueprint(bl_modals.bp)
 
     from . import bl_references
     app.register_blueprint(bl_references.bp)
