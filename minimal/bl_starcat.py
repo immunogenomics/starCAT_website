@@ -9,7 +9,8 @@ import pandas as pd
 import numpy as np
 import scanpy as sc
 from starcat import starCAT
-
+import random
+import string
 
 bp = Blueprint('bl_starcat', __name__, url_prefix='/starcat')
 
@@ -19,19 +20,20 @@ def runstarcat():
 
     if request.method == 'POST':
         # Retrieve the selected reference from the form data
-        selected_ref = request.form.get('ref')
-        session['selected_ref'] = selected_ref
+        session['selected_ref'] = request.form.get('ref')
 
         file = request.files['file']
         if file:
-            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], file.filename)
-            os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
+            id = ''.join(random.choice(string.ascii_letters) for _ in range(15))
+            os.makedirs(os.path.join(current_app.config['UPLOAD_FOLDER'], id), exist_ok=True)
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], id, file.filename)
             file.save(file_path)
 
             if session.get('selected_ref'):
-                process_data(file_path)
-                out_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'starCAT_output.tar.gz')
-                return send_file(os.path.join(os.getcwd(), out_file), as_attachment=True)
+                process_data(file_path, id)
+                out_file = os.path.join(current_app.config['UPLOAD_FOLDER'], id, 'starCAT_output.tar.gz')
+                return send_file(os.path.join(os.getcwd(), out_file), as_attachment=True,
+                                 download_name = 'starCAT_output.tar.gz')
             else:
                 flash("Please select a reference.")
 
@@ -39,10 +41,10 @@ def runstarcat():
                            selected_ref=session.get('selected_ref'))
 
 
-def process_data(file_path):
+def process_data(file_path, id):
     # Run starCAT
-    out_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'starCAT_output')
-    out_file = os.path.join(current_app.config['UPLOAD_FOLDER'], 'starCAT_output.tar.gz')
+    out_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], id, 'starCAT_output')
+    out_file = os.path.join(current_app.config['UPLOAD_FOLDER'], id, 'starCAT_output.tar.gz')
     os.makedirs(out_dir, exist_ok=True)
 
     cat = starCAT(reference=session.get('selected_ref'), cachedir=current_app.config['UPLOAD_FOLDER'])
