@@ -14,3 +14,4 @@ starcatpy
 flask_wtf==1.2.1
 wtforms==3.1.2
 flask_bcrypt==1.0.1
+email_validator==2.2.0
