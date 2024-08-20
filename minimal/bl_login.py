@@ -25,7 +25,7 @@ def login():
             next_page = request.args.get('next')
             return redirect(next_page) if next_page else redirect(url_for('home'))
         else:
-            flash('Login Unsuccessful. Please check email and password', 'danger')
+            flash('Login Unsuccessful', 'danger')
 
     elif registration_form.validate_on_submit() and 'register' in request.form:
         hashed_password = bcrypt.generate_password_hash(registration_form.password.data).decode('utf-8')
