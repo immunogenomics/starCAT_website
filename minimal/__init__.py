@@ -4,7 +4,7 @@ from flask_login import LoginManager
 from .jinjafilters import *
 from .errorhandlers import *
 from .config import Config
-from .user_model import db
+from .user_model import db, User
 
 
 login_manager = LoginManager()
@@ -33,8 +33,8 @@ def create_app():
     from . import bl_starcat
     app.register_blueprint(bl_starcat.bp)
 
-    from . import bl_login
-    app.register_blueprint(bl_login.bp)
+    from . import bl_register
+    app.register_blueprint(bl_register.bp)
 
     from . import auth
     app.register_blueprint(auth.bp)
