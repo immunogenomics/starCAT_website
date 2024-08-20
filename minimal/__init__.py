@@ -33,9 +33,6 @@ def create_app():
     from . import bl_starcat
     app.register_blueprint(bl_starcat.bp)
 
-    from . import bl_modals
-    app.register_blueprint(bl_modals.bp)
-
     from . import bl_login
     app.register_blueprint(bl_login.bp)
 
