@@ -7,3 +7,4 @@ class Config:
     DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
     TESTING = os.getenv('FLASK_TESTING', 'False').lower() in ['true', '1', 't']
     UPLOAD_FOLDER = './minimal/uploads'
+    MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024
