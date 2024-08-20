@@ -11,6 +11,7 @@ import scanpy as sc
 from starcat import starCAT
 import random
 import string
+from werkzeug.exceptions import RequestEntityTooLarge
 
 bp = Blueprint('bl_starcat', __name__, url_prefix='/starcat')
 
@@ -24,22 +25,27 @@ def runstarcat():
 
         file = request.files['file']
         if file:
-            id = ''.join(random.choice(string.ascii_letters) for _ in range(15))
-            os.makedirs(os.path.join(current_app.config['UPLOAD_FOLDER'], id), exist_ok=True)
-            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], id, file.filename)
-            file.save(file_path)
-
-            if session.get('selected_ref'):
-                process_data(file_path, id)
-                out_file = os.path.join(current_app.config['UPLOAD_FOLDER'], id, 'starCAT_output.tar.gz')
-                return send_file(os.path.join(os.getcwd(), out_file), as_attachment=True,
-                                 download_name = 'starCAT_output.tar.gz')
+            if os.path.splitext(file.filename)[-1]!='.h5ad':
+                flash("File Type Error")
             else:
-                flash("Please select a reference.")
+                id = ''.join(random.choice(string.ascii_letters) for _ in range(15))
+                os.makedirs(os.path.join(current_app.config['UPLOAD_FOLDER'], id), exist_ok=True)
+                file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], id, file.filename)
+                file.save(file_path)
+
+                if session.get('selected_ref'):
+                    process_data(file_path, id)
+                    out_file = os.path.join(current_app.config['UPLOAD_FOLDER'], id, 'starCAT_output.tar.gz')
+                    return send_file(os.path.join(os.getcwd(), out_file), as_attachment=True,
+                                    download_name = 'starCAT_output.tar.gz')
 
     return render_template('starcat/starcatpage.html', mc=mc, references=['TCAT.V1', 'BCAT.V1'], 
                            selected_ref=session.get('selected_ref'))
 
+@bp.errorhandler(RequestEntityTooLarge)
+def file_size_error(error):
+    flash('File Size Error')
+    return redirect(url_for('bl_starcat.runstarcat'))
 
 def process_data(file_path, id):
     # Run starCAT
