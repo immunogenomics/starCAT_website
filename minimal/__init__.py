@@ -13,8 +13,13 @@ def create_app():
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
-    db.init_app(app)
 
+    # Create the user login database tables
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
+
+    # Create the login manager
     login_manager.init_app(app)
     #login_manager.login_view = 'bp.login'
     #login_manager.login_message_category = 'info'
@@ -27,6 +32,9 @@ def create_app():
 
     from . import bl_starcat
     app.register_blueprint(bl_starcat.bp)
+
+    from . import bl_modals
+    app.register_blueprint(bl_modals.bp)
 
     from . import bl_login
     app.register_blueprint(bl_login.bp)

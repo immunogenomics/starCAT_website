@@ -4,7 +4,6 @@ import time
 import threading
 import shutil
 
-app = create_app()
 
 def clear_uploads():
     '''Remove file uploads older than 1 hr.'''
@@ -21,6 +20,8 @@ def clear_uploads():
                     print(f'Deleted: {subdir_path}')
         time.sleep(300)
 
-threading.Thread(target=clear_uploads, daemon=True).start()
 
-app.run(port=8001)
+if __name__ == "__main__":
+    app = create_app()
+    threading.Thread(target=clear_uploads, daemon=True).start()
+    app.run(port=8001)
