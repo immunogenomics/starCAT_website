@@ -23,16 +23,18 @@ def login():
         if user and bcrypt.check_password_hash(user.password, login_form.password.data):
             login_user(user, remember=login_form.remember.data)
             next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('home'))
+            return redirect(next_page) if next_page else redirect(url_for('bl_home.index'))
         else:
-            flash('Login Unsuccessful', 'danger')
+            flash('Login Unsuccessful. Please check email and password and make sure you have already registered.', 'danger')
 
-    elif registration_form.validate_on_submit() and 'register' in request.form:
+    elif login_form.validate_on_submit() and 'register' in request.form:
         hashed_password = bcrypt.generate_password_hash(registration_form.password.data).decode('utf-8')
-        user = User(username=registration_form.username.data, email=registration_form.email.data, password=hashed_password)
+        user = User(username=registration_form.email.data, email=registration_form.email.data, password=hashed_password)
+        print(hashed_password)
+        print(user)
         db.session.add(user)
         db.session.commit()
-        flash('Your account has been created! You can now log in', 'success')
+        flash('Your account has been created! You can now log in.', 'success')
         return redirect(url_for('bp.auth'))
     
     return render_template('login/login.html', mc=mc, login_form=login_form, registration_form=registration_form)
