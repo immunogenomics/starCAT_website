@@ -8,3 +8,8 @@ class Config:
     TESTING = os.getenv('FLASK_TESTING', 'False').lower() in ['true', '1', 't']
     UPLOAD_FOLDER = './minimal/uploads'
     MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024
+    MAIL_SERVER = 'smtp.googlemail.com'
+    MAIL_PORT = 587
+    MAIL_USE_TLS = True
+    MAIL_USERNAME = os.environ.get('EMAIL_USER')
+    MAIL_PASSWORD = os.environ.get('EMAIL_PASS')

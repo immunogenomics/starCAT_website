@@ -3,7 +3,7 @@ from flask import (
 )
 from .layoutUtils import *
 from .auth import *
-from .user_model import User, db  # Import User model for authentication
+from .user_model import User, db, RequestResetForm, ResetPasswordForm
 import os
 import tarfile
 import random
@@ -11,6 +11,8 @@ import string
 from werkzeug.exceptions import RequestEntityTooLarge
 from flask_bcrypt import Bcrypt
 from starcat import starCAT
+from .email import send_reset_email
+from flask_login import current_user
 
 bcrypt = Bcrypt()
 bp = Blueprint('bl_starcat', __name__, url_prefix='/starcat')
@@ -68,3 +70,33 @@ def process_data(file_path, id):
 
     with tarfile.open(out_file, "w:gz") as tar:
         tar.add(out_dir, arcname='starCAT_output')
+
+@bp.route("/reset_password", methods=['GET', 'POST'])
+def reset_request():
+    mc = set_menu("starcat")
+    form = RequestResetForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            send_reset_email(user)
+        flash('If an account with that email exists, a reset link has been sent.', 'info')
+        return redirect(url_for('bl_login.login'))
+    return render_template('starcat/reset_request.html', mc=mc, form=form)
+
+@bp.route("/reset_password/<token>", methods=['GET', 'POST'])
+def reset_token(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    user = User.verify_reset_token(token)
+    if user is None:
+        flash('That is an invalid or expired token', 'warning')
+        return redirect(url_for('bl_starcat.reset_request'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+        user.password = hashed_password
+        db.session.commit()
+        flash('Your password has been updated! You are now able to log in', 'success')
+        return redirect(url_for('bl_login.login'))
+    return render_template('starcat/reset_token.html', form=form)
+

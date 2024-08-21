@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block metatags %}
+<title>Run | starCAT</title>
+<meta name="description" content="Run starCAT">
+{% endblock %}
+
+{% block contents %}
+    <div class="container">
+        </br>
+        <p class="lead">Please enter your e-mail address to receive a password reset link</p>
+        <form action="{{ url_for('bl_starcat.reset_request') }}" method="post">
+            {{ form.hidden_tag() }}
+            <div class="form-group">
+                {{ form.email.label(class="form-label") }}
+                {{ form.email(class="form-control") }}
+            </div>
+            </br>
+            <div class="form-group">
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+{% endblock %}

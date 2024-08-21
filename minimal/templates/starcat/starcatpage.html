@@ -16,8 +16,6 @@
 
     <p class="lead">To run starCAT from the web browser, first <a href="{{url_for('bl_register.register')}}">register</a> and input your username</br>
         and password. Then select a reference and upload your query data.</br></p>
-
-    <!-- Combined form to handle login, reference selection, and file upload -->
     <form action="{{ url_for('bl_starcat.runstarcat') }}" method="post" enctype="multipart/form-data">
         <div class="form-group col-md-6">
             <label for="email">Email:</label>
@@ -27,6 +25,8 @@
             <label for="password">Password:</label>
             <input type="password" name="password" id="password" class="form-control" required>
         </div>
+        <a href="{{url_for('bl_starcat.reset_request')}}">Forgot password?</a>
+        </br>
         </br>
         <div class="form-group col-md-6">
             <label for="ref">Select a starCAT reference catalog:</label>

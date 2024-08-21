@@ -1,6 +1,7 @@
 import os
 from flask import Flask
 from flask_login import LoginManager
+from flask_mail import Mail
 from .jinjafilters import *
 from .errorhandlers import *
 from .config import Config
@@ -8,6 +9,7 @@ from .user_model import db, User
 
 
 login_manager = LoginManager()
+mail = Mail()
 
 def create_app():
     # create and configure the app
@@ -18,6 +20,8 @@ def create_app():
     db.init_app(app)
     with app.app_context():
         db.create_all()
+
+    mail.init_app(app)
 
     # Create the login manager
     login_manager.init_app(app)
