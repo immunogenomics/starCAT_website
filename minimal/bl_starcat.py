@@ -78,15 +78,16 @@ def reset_request():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user:
+            print("MAIL_USERNAME:", current_app.config['MAIL_USERNAME'])
+            print("MAIL_PASSWORD:", current_app.config['MAIL_PASSWORD'])  # Be cautious with printing sensitive information
             send_reset_email(user)
         flash('If an account with that email exists, a reset link has been sent.', 'info')
-        return redirect(url_for('bl_login.login'))
+        return redirect(url_for('bl_starcat.runstarcat'))
     return render_template('starcat/reset_request.html', mc=mc, form=form)
 
 @bp.route("/reset_password/<token>", methods=['GET', 'POST'])
 def reset_token(token):
-    if current_user.is_authenticated:
-        return redirect(url_for('home'))
+    mc = set_menu("starcat")
     user = User.verify_reset_token(token)
     if user is None:
         flash('That is an invalid or expired token', 'warning')
@@ -97,6 +98,6 @@ def reset_token(token):
         user.password = hashed_password
         db.session.commit()
         flash('Your password has been updated! You are now able to log in', 'success')
-        return redirect(url_for('bl_login.login'))
-    return render_template('starcat/reset_token.html', form=form)
+        return redirect(url_for('bl_starcat.runstarcat'))
+    return render_template('starcat/reset_token.html', mc=mc, form=form)
 
