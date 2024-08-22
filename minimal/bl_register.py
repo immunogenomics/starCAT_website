@@ -3,6 +3,8 @@ from .user_model import RegistrationForm, User, db
 from flask_bcrypt import Bcrypt
 from flask_login import login_user, current_user, logout_user, login_required
 from .layoutUtils import *
+from .email import send_verification_email
+
 
 bcrypt = Bcrypt()
 
@@ -20,9 +22,27 @@ def register():
             user = User(username=registration_form.email.data, email=registration_form.email.data, password=hashed_password)
             db.session.add(user)
             db.session.commit()
-            flash('Your account has been created! You can now run starCAT.', 'success')
+
+            send_verification_email(user)
+
+            flash('A verification email has been sent to your email address. Please check your inbox.', 'info')
             return redirect(url_for('bl_register.register'))
         else:
             print(registration_form.errors)
 
     return render_template('register/register.html', mc=mc, registration_form=registration_form)
+
+
+@bp.route("/verify_email/<token>")
+def verify_email(token):
+    user = User.verify_reset_token(token)
+    if user is None:
+        flash('That is an invalid or expired token', 'warning')
+        return redirect(url_for('bl_register.register'))
+    
+    user.is_email_verified = True
+    db.session.commit()
+    flash('Your email has been verified! You can now run starCAT.', 'success')
+    return redirect(url_for('bl_starcat.runstarcat'))
+
+

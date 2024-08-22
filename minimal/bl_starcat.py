@@ -27,7 +27,7 @@ def runstarcat():
         
         # Authenticate user
         user = User.query.filter_by(email=email).first()
-        if user and bcrypt.check_password_hash(user.password, password):
+        if user and bcrypt.check_password_hash(user.password, password) and user.is_email_verified:
             session['selected_ref'] = request.form.get('ref')
             file = request.files['file']
             
@@ -46,7 +46,8 @@ def runstarcat():
                         return send_file(os.path.join(os.getcwd(), out_file), as_attachment=True,
                                          download_name='starCAT_output.tar.gz')
         else:
-            flash('Invalid email or password. Please check they are entered correctly and make sure you have already registered.', 'danger')
+            flash('Invalid email or password. Please check they are entered correctly and make sure you have already registered\
+                and verified your email', 'danger')
             return redirect(url_for('bl_starcat.runstarcat'))
 
     return render_template('starcat/starcatpage.html', mc=mc, references=['TCAT.V1', 'BCAT.V1'], 
@@ -78,8 +79,6 @@ def reset_request():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user:
-            print("MAIL_USERNAME:", current_app.config['MAIL_USERNAME'])
-            print("MAIL_PASSWORD:", current_app.config['MAIL_PASSWORD'])  # Be cautious with printing sensitive information
             send_reset_email(user)
         flash('If an account with that email exists, a reset link has been sent.', 'info')
         return redirect(url_for('bl_starcat.runstarcat'))
