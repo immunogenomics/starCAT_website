@@ -16,26 +16,7 @@ def displayError(errNum):
     result = errorDict[key]
     return result
 
-
-msgDict = { 
-    "Msg1": "<p>This is a <b>nice</b> message, the first of the list</p>",
-    "Msg2": "<p>This is an even <b>nicer</b> message.</p>",
-    # 'select_ref_message' : '<p>Please first submit a reference catalog selection and upload again.</p>',
-    'Invalid email or password. Please check they are entered correctly and make sure you have already registered.' : 
-        '<p>Invalid email or password. Please check they are entered correctly and make sure you have already registered.</p>',
-    'Your account has been created! You can now run starCAT.' : 
-        '<p>Your account has been created! You can now run starCAT.</p>',
-    'This email is already registered. Please choose a different one.' :
-        '<p>This email is already registered. Please choose a different one.</p>',
-    'File Type Error' : '<p>File Type Error. Please upload an ".h5ad" type file.</p>',
-    'File Size Error' : '<p>File Size Error. Please upload a smaller file (<2 GB) or refer to our <a href="https://github.com/immunogenomics/starCAT" target="_blank">'
-            'GitHub repository</a>  process larger datasets.</p>'
-
-    # 'processing_message' : '<p>Your data is processing.</p>',
-    
-}
-
 def displayMessage(msgKey):
     #THE DECORATOR IS NEEDED TO DISABLE CACHING OF JINJA CALLS!!!
-    result = Markup(msgDict[msgKey])
+    result = Markup(msgKey)
     return result
