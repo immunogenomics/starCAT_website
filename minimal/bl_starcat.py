@@ -35,6 +35,7 @@ def runstarcat():
                 if os.path.splitext(file.filename)[-1] != '.h5ad':
                     flash("File Type Error", 'danger')
                 else:
+                    print('hello')
                     id = ''.join(random.choice(string.ascii_letters) for _ in range(15))
                     os.makedirs(os.path.join(current_app.config['UPLOAD_FOLDER'], id), exist_ok=True)
                     file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], id, file.filename)

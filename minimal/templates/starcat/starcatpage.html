@@ -3,44 +3,97 @@
 {% block metatags %}
 <title>Run | starCAT</title>
 <meta name="description" content="Run starCAT">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
 {% endblock %}
 
 {% block contents %}
-<div class="container">
-    <div>
+    <div class="container">
         <ol class="breadcrumb small">
             <li class="breadcrumb-item"><a href="{{url_for('bl_home.index')}}">Home</a></li>
             <li class="breadcrumb-item active" aria-current="page">Run starCAT</li>
         </ol>
+
+        <p class="lead">
+            To run starCAT from the web browser, first <a href="{{url_for('bl_register.register')}}">register</a> and input your username and password.
+            Then select a reference and upload your query data.
+        </p>
+
+        <form id="dataForm">
+            <div class="form-group col-md-6">
+                <label for="email">Email:</label>
+                <input type="email" name="email" id="email" class="form-control" required>
+            </div>
+            <div class="form-group col-md-6">
+                <label for="password">Password:</label>
+                <input type="password" name="password" id="password" class="form-control" required>
+            </div>
+            <a href="{{url_for('bl_starcat.reset_request')}}">Forgot password?</a>
+            <br/><br/>
+            <div class="form-group col-md-6">
+                <label for="ref">Select a starCAT reference catalog:</label>
+                <select name="ref" id="ref" class="form-control">
+                    {% for ref in references %}
+                    <option value="{{ ref }}" {% if ref == selected_ref %}selected{% endif %}>{{ ref }}</option>
+                    {% endfor %}
+                </select>
+            </div>    
+            <div class="form-group col-md-6">
+                <label for="file">Upload your data in .h5ad format. Please ensure the file size is less than 2 GB.</label>
+                <input type="file" name="file" id="file" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Upload</button>
+        </form>
+        <div id="output"></div>
     </div>
 
-    <p class="lead">To run starCAT from the web browser, first <a href="{{url_for('bl_register.register')}}">register</a> and input your username</br>
-        and password. Then select a reference and upload your query data.</br></p>
-    <form action="{{ url_for('bl_starcat.runstarcat') }}" method="post" enctype="multipart/form-data">
-        <div class="form-group col-md-6">
-            <label for="email">Email:</label>
-            <input type="email" name="email" id="email" class="form-control" required>
-        </div>
-        <div class="form-group col-md-6">
-            <label for="password">Password:</label>
-            <input type="password" name="password" id="password" class="form-control" required>
-        </div>
-        <a href="{{url_for('bl_starcat.reset_request')}}">Forgot password?</a>
-        </br>
-        </br>
-        <div class="form-group col-md-6">
-            <label for="ref">Select a starCAT reference catalog:</label>
-            <select name="ref" id="ref" class="form-control">
-                {% for ref in references %}
-                <option value="{{ ref }}" {% if ref == selected_ref %}selected{% endif %}>{{ ref }}</option>
-                {% endfor %}
-            </select>
-        </div>    
-        <div class="form-group col-md-6">
-            <label for="file">Upload your data in .h5ad format. Please ensure the file size is less than 2 GB.</label>
-            <input type="file" name="file" id="file" class="form-control" required>
-        </div>
-        <button type="submit" class="btn btn-primary mt-3">Upload</button>
-    </form>
-</div>
+<script type="text/javascript">
+    window.onload = async function() {
+        try {
+            console.log("Loading Pyodide...");
+            document.getElementById('output').innerText = "Loading Pyodide...";
+            let pyodide = await loadPyodide();
+            console.log("Pyodide loaded successfully.");
+            document.getElementById('output').innerText = "Pyodide loaded successfully.";
+
+            console.log("Loading micropip package...");
+            await pyodide.loadPackage("micropip");
+            console.log("micropip loaded successfully.");
+            document.getElementById('output').innerText += "\nmicropip loaded successfully.";
+
+            const micropip = pyodide.pyimport("micropip");
+            console.log("Installing starcatpy package...");
+            document.getElementById('output').innerText += "\nInstalling starcatpy package...";
+            await micropip.install('starcatpy');
+            console.log("starcatpy installed successfully.");
+            document.getElementById('output').innerText += "\nstarcatpy installed successfully.";
+
+            document.getElementById('dataForm').addEventListener('submit', function(event) {
+                event.preventDefault();
+                console.log("Form submitted, starting processing...");
+                document.getElementById('output').innerText = "Processing Result: ";
+                let ref = document.getElementById('ref').value;
+                let fileInput = document.getElementById('file');
+                let file = fileInput.files[0];  // Get the file object
+                console.log("Selected Reference:", ref);
+                if (file) {
+                    console.log("File Name:", file.name);
+                    console.log("File Size:", file.size, "bytes");
+                } else {
+                    console.log("No file selected");
+                }
+
+
+                // Keep the console open by adding a delay
+                console.log("Pausing for 10 seconds...");
+                setTimeout(() => {
+                    console.log("Done!");
+                }, 5000);  // 10,000 milliseconds = 10 seconds
+
+            });
+        } catch (error) {
+            console.error("An error occurred:", error);
+            document.getElementById('output').innerText = "An error occurred: " + error.message;
+        }
+    }
+</script>
 {% endblock %}
