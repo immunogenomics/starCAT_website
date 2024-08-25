@@ -79,9 +79,10 @@
                 event.preventDefault();
                 console.log("Form submitted, starting processing...");
                 document.getElementById('output').innerText = "Processing Result: ";
-                let ref = document.getElementById('ref').value;
-                let fileInput = document.getElementById('file');
-                let file = fileInput.files[0];  // Get the file object
+                ref = document.getElementById('ref').value;
+                fileInput = document.getElementById('file');
+                file = fileInput.files[0];  // Get the file object
+                base_url = window.location.origin;
                 console.log("Selected Reference:", ref);
                 if (file) {
                     console.log("File Name:", file.name);
@@ -90,43 +91,89 @@
                     console.log("No file selected");
                 }
 
-                //pyodide.FS.mkdirTree(cachedir);
-                //pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, {}, cachedir);
                 console.log("Running starCAT");
                 document.getElementById('output').innerText += "\nRunning starCAT";
+                reader = new FileReader();
+                reader.onload = async function(event) {
+                    fileData = new Uint8Array(event.target.result);
 
-                pyodide.runPythonAsync(`
-                    import starcat
-                    import pandas as pd
-                    import os
-                    import js
-                    from pyodide.http import pyfetch
+                    pyodide.runPythonAsync(`
+                        import starcat
+                        import pandas as pd
+                        import os
+                        import io
+                        from js import ref, base_url, fileData
+                        from pyodide.http import pyfetch
+                        import anndata
+                        import zipfile
 
-                    #refdata = pd.read_csv(starcat.reference_url, sep='\t', comment='#')
-                    #print(js.ref.value)
-                    #ref_url = refdata.loc[refdata['Name']==js.ref.value, 'Link'].values[0]
-                    ref_url = 'http://127.0.0.1:5000/static/reference_cache/%s.tar.gz' % js.ref.value
-                    print(ref_url)
-                    print(os.listdir('.'))
-                    print('downloading ref data')
-                    response = await pyfetch(ref_url)
-                    tar_fn = '%s.tar.gz' % js.ref.value
-                    with open(tar_fn, 'wb') as f:
-                        f.write(await response.bytes())
+                        print('Loading adata file')
+                        file_data = io.BytesIO(bytearray(fileData))
+                        adata = anndata.read_h5ad(file_data)
+                        print(adata)
+                        print('File loaded successfully')
 
-                    print('c')
-                    print(os.listdir('.'))
-                    #response.unpack_archive()
+                        print('downloading selected reference: %s' % ref)
+                        ref_url = os.path.join(base_url, 'references/download/%s.tar.gz' % ref)
+                        print('downloading ref data')
+                        response = await pyfetch(ref_url)
+                        tar_fn = '%s.tar.gz' % ref
+                        with open(tar_fn, 'wb') as f:
+                            f.write(await response.bytes())
+                        print('reference downloaded successfully')
 
-                    `);
+                        print('extracting tar')
+                        starcat.decompress_tar('./%s.tar.gz' % ref, '.')
+                        print('extracted successfully')
 
-                // Keep the console open by adding a delay
-                // console.log("Pausing for 10 seconds...");
-                // setTimeout(() => {
-                //     console.log("Done!");
-                // }, 15000);  // 10,000 milliseconds = 10 seconds
+                        print('Running starCAT')
+                        cat = starcat.starCAT(reference = ref, cachedir='.')
+                        usage, scores = cat.fit_transform(adata)
+                        print('starCAT completed successfully')
 
-            });
+                        # Convert the first DataFrame to a CSV in memory
+                        usage_buffer = io.BytesIO()
+                        usage.to_csv(usage_buffer, sep='\t')
+                        usage_buffer.seek(0)  # Rewind the buffer to the beginning
+                        usage_bytes = usage_buffer.getvalue()
+
+                        # Convert the second DataFrame to a CSV in memory
+                        scores_buffer = io.BytesIO()
+                        if scores is not None:
+                            scores.to_csv(scores_buffer, sep='\t')
+                        scores_buffer.seek(0)  # Rewind the buffer to the beginning
+                        scores_bytes = scores_buffer.getvalue()
+
+                        # Return both byte arrays to JavaScript
+                        usage_bytes, scores_bytes
+
+
+                    `).then(([usage_bytes, score_bytes]) => {
+                        // Convert the first file's byte array to a Blob and trigger download
+                        const usageBlob = new Blob([new Uint8Array(usage_bytes)], { type: 'text/tab-separated-values' });
+                        const usageUrl = URL.createObjectURL(usageBlob);
+                        const usageLink = document.createElement('a');
+                        usageLink.href = usageUrl;
+                        usageLink.download = 'starcat_results_usage.tsv';
+                        document.body.appendChild(usageLink);
+                        usageLink.click();
+                        document.body.removeChild(usageLink);
+                        URL.revokeObjectURL(usageUrl);  // Clean up
+
+                        // Convert the second file's byte array to a Blob and trigger download
+                        const scoreBlob = new Blob([new Uint8Array(score_bytes)], { type: 'text/tab-separated-values' });
+                        const scoreUrl = URL.createObjectURL(scoreBlob);
+                        const scoreLink = document.createElement('a');
+                        scoreLink.href = scoreUrl;
+                        scoreLink.download = 'starcat_results_scores.tsv';
+                        document.body.appendChild(scoreLink);
+                        scoreLink.click();
+                        document.body.removeChild(scoreLink);
+                        URL.revokeObjectURL(scoreLink);  // Clean up
+                    });
+                };
+            reader.readAsArrayBuffer(file);
+            })
         } catch (error) {
             console.error("An error occurred:", error);
             document.getElementById('output').innerText = "An error occurred: " + error.message;
