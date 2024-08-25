@@ -7,7 +7,16 @@
 
 {% block contents %}
      <div class="container">
-        <h2>If you haven't already, register below:</h2>
+
+    <div>
+        <ol class="breadcrumb small">
+            <li class="breadcrumb-item"><a href="{{url_for('bl_home.index')}}">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Registration</li>
+        </ol>
+    </div>
+
+        <h1>Registration</h1>
+        <p class="lead">Please register below to run starCAT from the browser</br></p>
             <div class="col-md-6">
                 <form method="POST" action="{{ url_for('bl_register.register') }}">
                     {{ registration_form.hidden_tag() }}

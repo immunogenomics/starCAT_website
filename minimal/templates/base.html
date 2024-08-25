@@ -16,7 +16,6 @@
 		<!-- Custom styles for this template -->
 		<link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 
-
     	<style>
     	    /* Basic styles for the dropdown */
     	    .dropdown {
@@ -50,13 +49,45 @@
     	        background-color: #3e8e41;
     	    }
 
-    		select {
-        	font-size: inherit; /* Control font size of the dropdown text */
-        	padding: 5px 5px; /* Padding inside the dropdown to make it larger */
-        	width: 150px; /* Width of the dropdown menu */
-    		}
+        	table.dataframe {
+            	width: 100%;
+            	border-collapse: collapse; /* Ensures borders are single lines */
+            	margin-bottom: 1rem;
+            	background-color: transparent;
+        	}
 
+        	/* Style table headers */
+        	table.dataframe th {
+            	background-color: #f8f9fa; /* Light background for headers */
+            	color: #343a40; /* Darker text color for contrast */
+            	text-align: center; /* Center text in headers */
+            	padding: 8px;
+            	border: 1px solid #dee2e6; /* Light gray borders */
+        	}
 
+        	/* Style table cells */
+        	table.dataframe td {
+            	padding: 8px;
+            	text-align: left; /* Left-align text in cells */
+            	border: 1px solid #dee2e6; /* Light gray borders */
+            	white-space: pre-wrap; /* Allow new lines in text */
+            	word-wrap: break-word;  /* Break long words */
+            	vertical-align: top;
+        	}
+
+        	/* Style for alternating row colors */
+        	table.dataframe tbody tr:nth-child(odd) {
+            	background-color: #f2f2f2; /* Light gray for odd rows */
+        	}
+
+        	table.dataframe tbody tr:nth-child(even) {
+            	background-color: #ffffff; /* White for even rows */
+        	}
+
+        	/* Optional: Hover effect for table rows */
+        	table.dataframe tbody tr:hover {
+            	background-color: #e9ecef; /* Slightly darker gray when hovering */
+        	}
     	</style>
 
 	</head>
