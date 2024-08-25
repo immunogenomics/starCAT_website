@@ -61,11 +61,19 @@
             document.getElementById('output').innerText += "\nmicropip loaded successfully.";
 
             const micropip = pyodide.pyimport("micropip");
-            console.log("Installing starcatpy package...");
+            console.log("Installing micropip package...");
             document.getElementById('output').innerText += "\nInstalling starcatpy package...";
-            await micropip.install('starcatpy');
-            console.log("starcatpy installed successfully.");
-            document.getElementById('output').innerText += "\nstarcatpy installed successfully.";
+
+            try {
+                console.log("Installing starcatpy package...");
+                document.getElementById('output').innerText += "\nInstalling starcatpy package...";
+                await micropip.install('starcatpy', keep_going=true);
+                console.log("starcatpy installed successfully.");
+                document.getElementById('output').innerText += "\nstarcatpy installed successfully.";
+            } catch (error) {
+                console.error("Failed to install starcatpy:", error);
+                document.getElementById('output').innerText += "\nFailed to install starcatpy: " + error.message;
+            }
 
             document.getElementById('dataForm').addEventListener('submit', function(event) {
                 event.preventDefault();
@@ -82,6 +90,11 @@
                     console.log("No file selected");
                 }
 
+                pyodide.runPython(`
+                    from starcat import starCAT
+                    cat = starCAT(reference='TCAT.V1', cachedir='.')
+                    print(cat)
+                    `);
 
                 // Keep the console open by adding a delay
                 console.log("Pausing for 10 seconds...");
