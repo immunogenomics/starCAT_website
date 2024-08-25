@@ -90,17 +90,41 @@
                     console.log("No file selected");
                 }
 
-                pyodide.runPython(`
-                    from starcat import starCAT
-                    cat = starCAT(reference='TCAT.V1', cachedir='.')
-                    print(cat)
+                //pyodide.FS.mkdirTree(cachedir);
+                //pyodide.FS.mount(pyodide.FS.filesystems.IDBFS, {}, cachedir);
+                console.log("Running starCAT");
+                document.getElementById('output').innerText += "\nRunning starCAT";
+
+                pyodide.runPythonAsync(`
+                    import starcat
+                    import pandas as pd
+                    import os
+                    import js
+                    from pyodide.http import pyfetch
+
+                    #refdata = pd.read_csv(starcat.reference_url, sep='\t', comment='#')
+                    #print(js.ref.value)
+                    #ref_url = refdata.loc[refdata['Name']==js.ref.value, 'Link'].values[0]
+                    ref_url = 'http://127.0.0.1:5000/static/reference_cache/%s.tar.gz' % js.ref.value
+                    print(ref_url)
+                    print(os.listdir('.'))
+                    print('downloading ref data')
+                    response = await pyfetch(ref_url)
+                    tar_fn = '%s.tar.gz' % js.ref.value
+                    with open(tar_fn, 'wb') as f:
+                        f.write(await response.bytes())
+
+                    print('c')
+                    print(os.listdir('.'))
+                    #response.unpack_archive()
+
                     `);
 
                 // Keep the console open by adding a delay
-                console.log("Pausing for 10 seconds...");
-                setTimeout(() => {
-                    console.log("Done!");
-                }, 5000);  // 10,000 milliseconds = 10 seconds
+                // console.log("Pausing for 10 seconds...");
+                // setTimeout(() => {
+                //     console.log("Done!");
+                // }, 15000);  // 10,000 milliseconds = 10 seconds
 
             });
         } catch (error) {
