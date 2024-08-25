@@ -14,6 +14,7 @@
         </ol>
     </div>
 
+    <h1>Run starCAT</h1>
     <p class="lead">To run starCAT from the web browser, first <a href="{{url_for('bl_register.register')}}">register</a> and input your username</br>
         and password. Then select a reference and upload your query data.</br></p>
     <form action="{{ url_for('bl_starcat.runstarcat') }}" method="post" enctype="multipart/form-data">
