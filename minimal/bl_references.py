@@ -3,19 +3,18 @@ from flask import (
 )
 from .layoutUtils import *
 from .auth import *
-import pandas as pd
 from werkzeug.utils import safe_join
+import pandas as pd
+from minimal import reference_data
 
 bp = Blueprint('bl_references', __name__, url_prefix='/references')
-
-refurl = 'https://raw.githubusercontent.com/immunogenomics/starCAT/development/src/starcat/current_references.tsv'
 
 @bp.route('/',methods=('GET', 'POST'))
 #@manage_cookie_policy
 def refspawn():
     mc = set_menu("references")
 
-    refdata = pd.read_csv(refurl, sep='\t', comment='#')
+    refdata = reference_data.copy()
     refdata['Download'] = ''
     for i in refdata.index:
         link = url_for("bl_references.download_file", filename=refdata.at[i, 'Name']+'.tar.gz')
