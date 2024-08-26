@@ -2,6 +2,26 @@
 
 {% block metatags %}
 <title>Run | starCAT</title>
+<style>
+    #progress-container {
+        width: 50%;
+        background-color: #f3f3f3;
+        border: 1px solid #ccc;
+        margin-top: 20px;
+        border-radius: 10px;
+        overflow: hidden;
+        display: none; /* Initially hidden */
+    }
+    #progress-bar {
+        width: 0%; /* Start with 0% width */
+        height: 30px;
+        background-color: #B9C0F0;
+        text-align: center;
+        line-height: 30px;
+        color: white;
+        border-radius: 10px;
+    }
+</style>
 <meta name="description" content="Run starCAT">
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
 {% endblock %}
@@ -43,10 +63,19 @@
             </div>
             <button type="submit" class="btn btn-primary mt-3">Upload</button>
         </form>
+        <div id="progress-container">
+            <div id="progress-bar">0%</div>
+        </div>
         <div id="output"></div>
     </div>
 
 <script type="text/javascript">
+    // Define a function to update the progress bar
+    window.updateProgress = function(percentage, message) {
+        document.getElementById('progress-bar').style.width = percentage;
+        document.getElementById('output').innerText += "\n" + message;
+    }
+
     window.onload = async function() {
         try {
             console.log("Loading Pyodide...");
@@ -75,10 +104,10 @@
                 document.getElementById('output').innerText += "\nFailed to install starcatpy: " + error.message;
             }
 
+
             document.getElementById('dataForm').addEventListener('submit', function(event) {
                 event.preventDefault();
                 console.log("Form submitted, starting processing...");
-                document.getElementById('output').innerText = "Processing Result: ";
                 ref = document.getElementById('ref').value;
                 fileInput = document.getElementById('file');
                 file = fileInput.files[0];  // Get the file object
@@ -92,7 +121,13 @@
                 }
 
                 console.log("Running starCAT");
-                document.getElementById('output').innerText += "\nRunning starCAT";
+                document.getElementById('output').innerText += "\nInitializing...";
+
+                // Initialize/update progress bar
+                document.getElementById('progress-container').style.display = 'block';
+                document.getElementById('progress-bar').style.width = '25%';
+                document.getElementById('progress-bar').textContent = 'Processing...';
+
                 reader = new FileReader();
                 reader.onload = async function(event) {
                     fileData = new Uint8Array(event.target.result);
@@ -102,18 +137,21 @@
                         import pandas as pd
                         import os
                         import io
-                        from js import ref, base_url, fileData
+                        from js import ref, base_url, fileData, updateProgress
                         from pyodide.http import pyfetch
                         import anndata
                         import zipfile
 
+
                         print('Loading adata file')
+                        updateProgress('33%', 'Loading adata file.')
                         file_data = io.BytesIO(bytearray(fileData))
                         adata = anndata.read_h5ad(file_data)
                         print(adata)
                         print('File loaded successfully')
 
                         print('downloading selected reference: %s' % ref)
+                        updateProgress('50%', 'Downloading selected reference: %s.' % ref)
                         ref_url = os.path.join(base_url, 'references/download/%s.tar.gz' % ref)
                         print('downloading ref data')
                         response = await pyfetch(ref_url)
@@ -123,10 +161,12 @@
                         print('reference downloaded successfully')
 
                         print('extracting tar')
+                        updateProgress('60%', 'Extracting tar.')
                         starcat.decompress_tar('./%s.tar.gz' % ref, '.')
                         print('extracted successfully')
 
                         print('Running starCAT')
+                        updateProgress('75%', 'Running starCAT.')
                         cat = starcat.starCAT(reference = ref, cachedir='.')
                         usage, scores = cat.fit_transform(adata)
                         print('starCAT completed successfully')
@@ -170,6 +210,11 @@
                         scoreLink.click();
                         document.body.removeChild(scoreLink);
                         URL.revokeObjectURL(scoreLink);  // Clean up
+
+                        document.getElementById('progress-bar').style.width = '100%';
+                        document.getElementById('progress-bar').textContent = 'Complete... downloading files.';
+                        document.getElementById('output').innerText += '\nComplete.';
+
                     });
                 };
             reader.readAsArrayBuffer(file);
@@ -177,7 +222,11 @@
         } catch (error) {
             console.error("An error occurred:", error);
             document.getElementById('output').innerText = "An error occurred: " + error.message;
+            document.getElementById('progress-container').style.display = none;
         }
     }
 </script>
 {% endblock %}
+
+
+
