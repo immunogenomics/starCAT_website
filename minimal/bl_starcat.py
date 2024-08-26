@@ -13,6 +13,7 @@ from flask_bcrypt import Bcrypt
 from starcat import starCAT
 from .email import send_reset_email
 from flask_login import current_user
+from minimal import reference_names
 
 bcrypt = Bcrypt()
 bp = Blueprint('bl_starcat', __name__, url_prefix='/starcat')
@@ -51,7 +52,7 @@ def runstarcat():
                 and verified your email', 'danger')
             return redirect(url_for('bl_starcat.runstarcat'))
 
-    return render_template('starcat/starcatpage.html', mc=mc, references=['TCAT.V1', 'BCAT.V1'], 
+    return render_template('starcat/starcatpage.html', mc=mc, references=reference_names, 
                            selected_ref=session.get('selected_ref'))
 
 @bp.errorhandler(RequestEntityTooLarge)

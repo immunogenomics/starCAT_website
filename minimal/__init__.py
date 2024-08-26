@@ -6,10 +6,15 @@ from .jinjafilters import *
 from .errorhandlers import *
 from .config import Config
 from .user_model import db, User
+import pandas as pd
 
 
 login_manager = LoginManager()
 mail = Mail()
+
+refurl = 'https://raw.githubusercontent.com/immunogenomics/starCAT/main/src/starcat/current_references.tsv'
+reference_data = pd.read_csv(refurl, sep='\t', comment='#')
+reference_names = reference_data['Name'].to_list()
 
 def create_app():
     # create and configure the app
