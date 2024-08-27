@@ -28,15 +28,14 @@
 
 {% block contents %}
     <div class="container">
+
         <ol class="breadcrumb small">
             <li class="breadcrumb-item"><a href="{{url_for('bl_home.index')}}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{{url_for('bl_starcat.login')}}">Login</a></li>
             <li class="breadcrumb-item active" aria-current="page">Run starCAT</li>
         </ol>
 
-        <p class="lead">
-            To run starCAT from the web browser, first <a href="{{url_for('bl_register.register')}}">register</a> and input your username and password.
-            Then select a reference and upload your query data.
-        </p>
+        <button id="logout" class="btn btn-primary mt-3" style="float: right; margin-top: 20px;">Logout</button>
 
         <form id="dataForm">
             <div class="form-group col-md-6">
@@ -53,6 +52,7 @@
             </div>
             <button type="submit" class="btn btn-primary mt-3">Upload</button>
         </form>
+
         <div id="progress-container">
             <div id="progress-bar">0%</div>
         </div>
@@ -66,29 +66,33 @@
         document.getElementById('output').innerText += "\n" + message;
     }
 
+    document.getElementById('logout').onclick = function() {
+            window.location.href = "{{ url_for('bl_starcat.logout') }}";
+    };
+
     window.onload = async function() {
         try {
             console.log("Loading Pyodide...");
-            document.getElementById('output').innerText = "Loading Pyodide...";
+            document.getElementById('output').innerText = "\nBackground initialization:\n - Loading Pyodide...";
             let pyodide = await loadPyodide();
             console.log("Pyodide loaded successfully.");
-            document.getElementById('output').innerText = "Pyodide loaded successfully.";
+            document.getElementById('output').innerText += " Pyodide loaded successfully.";
 
             console.log("Loading micropip package...");
+            document.getElementById('output').innerText += "\n - Installing mircopip...";
             await pyodide.loadPackage("micropip");
             console.log("micropip loaded successfully.");
-            document.getElementById('output').innerText += "\nmicropip loaded successfully.";
+            document.getElementById('output').innerText += " Micropip installed successfully.";
 
             const micropip = pyodide.pyimport("micropip");
             console.log("Installing micropip package...");
-            document.getElementById('output').innerText += "\nInstalling starcatpy package...";
 
             try {
                 console.log("Installing starcatpy package...");
-                document.getElementById('output').innerText += "\nInstalling starcatpy package...";
+                document.getElementById('output').innerText += "\n - Installing starcatpy package...";
                 await micropip.install('starcatpy', keep_going=true);
                 console.log("starcatpy installed successfully.");
-                document.getElementById('output').innerText += "\nstarcatpy installed successfully.";
+                document.getElementById('output').innerText += " starcatpy installed successfully.";
             } catch (error) {
                 console.error("Failed to install starcatpy:", error);
                 document.getElementById('output').innerText += "\nFailed to install starcatpy: " + error.message;
@@ -111,7 +115,7 @@
                 }
 
                 console.log("Running starCAT");
-                document.getElementById('output').innerText += "\nInitializing...";
+                document.getElementById('output').innerText += "\n\nRunning starCAT:";
 
                 // Initialize/update progress bar
                 document.getElementById('progress-container').style.display = 'block';
@@ -133,33 +137,26 @@
                         import zipfile
 
 
-                        print('Loading adata file')
-                        updateProgress('33%', 'Loading adata file.')
+                        print('- Loading adata file...')
+                        updateProgress('33%', ' - Loading adata file.')
                         file_data = io.BytesIO(bytearray(fileData))
                         adata = anndata.read_h5ad(file_data)
-                        print(adata)
-                        print('File loaded successfully')
 
-                        print('downloading selected reference: %s' % ref)
-                        updateProgress('50%', 'Downloading selected reference: %s.' % ref)
+                        updateProgress('50%', ' - Downloading selected reference: %s.' % ref)
                         ref_url = os.path.join(base_url, 'references/download/%s.tar.gz' % ref)
-                        print('downloading ref data')
                         response = await pyfetch(ref_url)
                         tar_fn = '%s.tar.gz' % ref
                         with open(tar_fn, 'wb') as f:
                             f.write(await response.bytes())
-                        print('reference downloaded successfully')
 
-                        print('extracting tar')
-                        updateProgress('60%', 'Extracting tar.')
+                        updateProgress('60%', ' - Extracting tar.')
                         starcat.decompress_tar('./%s.tar.gz' % ref, '.')
                         print('extracted successfully')
 
                         print('Running starCAT')
-                        updateProgress('75%', 'Running starCAT.')
+                        updateProgress('75%', ' - Running starCAT.')
                         cat = starcat.starCAT(reference = ref, cachedir='.')
                         usage, scores = cat.fit_transform(adata)
-                        print('starCAT completed successfully')
 
                         # Convert the first DataFrame to a CSV in memory
                         usage_buffer = io.BytesIO()
@@ -202,7 +199,7 @@
                         document.getElementById('progress-bar').style.width = '100%';
                         document.getElementById('progress-bar').textContent = 'Complete... downloading files.';
                         document.getElementById('output').innerHTML += `
-                            <p>Complete. If files do not download automatically, you can download them manually:</p>
+                            <p> - Complete. If files do not download automatically, you can download them manually:</p>
                             <ul>
                                 <li><a href="${usageUrl}" download="starcat_results_usage.tsv">Download starcat_results_usage.tsv</a></li>
                                 <li><a href="${scoreUrl}" download="starcat_results_scores.tsv">Download starcat_results_scores.tsv</a></li>
