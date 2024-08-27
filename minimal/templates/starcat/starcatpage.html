@@ -187,8 +187,7 @@
                         usageLink.download = 'starcat_results_usage.tsv';
                         document.body.appendChild(usageLink);
                         usageLink.click();
-                        document.body.removeChild(usageLink);
-                        URL.revokeObjectURL(usageUrl);  // Clean up
+                        // URL.revokeObjectURL(usageUrl);  // Clean up
 
                         // Convert the second file's byte array to a Blob and trigger download
                         const scoreBlob = new Blob([new Uint8Array(score_bytes)], { type: 'text/tab-separated-values' });
@@ -198,12 +197,20 @@
                         scoreLink.download = 'starcat_results_scores.tsv';
                         document.body.appendChild(scoreLink);
                         scoreLink.click();
-                        document.body.removeChild(scoreLink);
-                        URL.revokeObjectURL(scoreLink);  // Clean up
+                        // URL.revokeObjectURL(scoreLink);  // Clean up
 
                         document.getElementById('progress-bar').style.width = '100%';
                         document.getElementById('progress-bar').textContent = 'Complete... downloading files.';
-                        document.getElementById('output').innerText += '\nComplete.';
+                        document.getElementById('output').innerHTML += `
+                            <p>Complete. If files do not download automatically, you can download them manually:</p>
+                            <ul>
+                                <li><a href="${usageUrl}" download="starcat_results_usage.tsv">Download starcat_results_usage.tsv</a></li>
+                                <li><a href="${scoreUrl}" download="starcat_results_scores.tsv">Download starcat_results_scores.tsv</a></li>
+                            </ul>
+                        `;
+
+                        document.body.removeChild(usageLink);
+                        document.body.removeChild(scoreLink);
 
                     });
                 };
