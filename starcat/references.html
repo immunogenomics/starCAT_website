@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>starcat References</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+    
+    <script data-goatcounter="https://slowkow.goatcounter.com/count"
+              async src="//gc.zgo.at/count.js"></script>
+    <style>
+    .table, .table th, .table td {
+        border: 1px solid #dee2e6;
+        text-align: center;
+    }
+    </style>
+        
+  </head>
+  <body>
+		<nav class="navbar navbar-expand-lg bg-light">
+			<div class="container-xxl bd-gutter flex-wrap flex-lg-nowrap">
+				<a class="navbar-brand" href="index.html"><span class="me-2"><img class="" height="60px" src="https://github.com/user-attachments/assets/bbb3286e-e79a-496f-9879-fe9c9ee560ed"></img></span>starCAT</a>
+				<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+					<span class="navbar-toggler-icon"></span>
+				</button>
+				<div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+					<div class="navbar-nav">
+                        <a class="nav-link" href="references.html">References</a>
+                        <a class="nav-link" href="https://github.com/immunogenomics/starcat">GitHub</a>
+                        <a class="nav-link" href="https://www.biorxiv.org/content/10.1101/2024.05.03.592310v1">BioRxiv</a>
+					</div>
+				</div>
+			</div>
+		</nav>
+
+    <div class="container mt-3">
+        <p class="lead">Available references for use with starCAT. If you use one of these references in your own work, please cite the corresponding paper as well as the <a href="https://www.biorxiv.org/content/10.1101/2024.05.03.592310v1">starCAT paper</a>.</p>
+        <div class="mt-4">
+            <pre class="bg-light" style="white-space: pre-wrap;" id="output"></pre>
+        </div>    
+       <div class="table-responsive">
+            <table id="references-table" class="table table-striped table-hover"></table>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        function log_status(mystring) {
+        console.log(mystring)
+        document.getElementById('output').innerText += '\n' + mystring
+        }
+
+        async function main() {
+            try {
+                log_status("Loading Pyodide...");
+                let pyodide = await loadPyodide();
+
+                log_status("Loading pandas...");
+                await pyodide.loadPackage('pandas');
+
+                // Use JavaScript's fetch to download the CSV content
+                log_status("Downloading reference table...");
+                const response = await fetch('https://raw.githubusercontent.com/immunogenomics/starCAT/main/src/starcat/current_references.tsv');
+                const ref_tsv = await response.text();
+
+                // Send the CSV data to Pyodide's Python environment
+                pyodide.globals.set('ref_tsv', ref_tsv);
+
+                // Python code to manipulate the data and generate the table HTML
+                const pythonCode = `
+import pandas as pd
+from io import StringIO
+
+reference_data = pd.read_csv(StringIO(ref_tsv), sep='\\t', comment='#')
+
+# Modify 'Download' and 'Description' columns
+reference_data['Download'] = ''
+for i in reference_data.index:
+    reference_data.at[i, 'Download'] = f'<a href="{reference_data.at[i, "Link"]}.tar.gz">Download</a>'
+    publink = f'<a href="{reference_data.at[i, "Publication_Link"]}">publication</a>'
+    reference_data.at[i, 'Description'] = reference_data.at[i, 'Description'].replace('publication', publink)
+    zenodolink = f'<a href="{reference_data.at[i, "Link"]}">{reference_data.at[i, "Name"]}</a>'
+    reference_data.at[i, 'Name'] = zenodolink
+
+# Filter the columns we need for the table
+cols = ['Name', 'Cell_Type', 'Tissue', 'Species', 'Contexts', 'Description', 'Download']
+table_html = reference_data[cols].to_html(classes="table table-striped table-hover", index=False, escape=False)
+table_html
+                `;
+
+                const tableHtml = await pyodide.runPythonAsync(pythonCode);
+                
+                // Insert the generated table into the HTML
+                document.getElementById('references-table').innerHTML = tableHtml;
+                document.getElementById('output').innerText = ''
+
+            } catch (error) {
+                log_status("An error occurred:", error);
+            }
+        }
+
+        // Initialize the Pyodide and run the main function
+        main();
+    </script>
+</body>
+</html>
