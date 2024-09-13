@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>starcat</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+    <script data-goatcounter="https://slowkow.goatcounter.com/count"
+              async src="//gc.zgo.at/count.js"></script>
+  </head>
+  <body>
+
+		<nav class="navbar navbar-expand-lg bg-light">
+			<div class="container-xxl bd-gutter flex-wrap flex-lg-nowrap">
+				<a class="navbar-brand" href="#"><span class="me-2"><img class="" height="60px" src="https://github.com/user-attachments/assets/bbb3286e-e79a-496f-9879-fe9c9ee560ed"></img></span>starCAT</a>
+				<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+					<span class="navbar-toggler-icon"></span>
+				</button>
+				<div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+					<div class="navbar-nav">
+            <a class="nav-link" href="https://github.com/immunogenomics/starcat">GitHub</a>
+            <a class="nav-link" href="https://www.biorxiv.org/content/10.1101/2024.05.03.592310v1">BioRxiv</a>
+					</div>
+				</div>
+			</div>
+		</nav>
+
+    <div class="container mt-3">
+      <p>starCAT is an algorithm to annotate single-cell transcriptomes with pre-defined catalogs of reference
+      gene expression programs (GEPs). Read more about starCAT in our <a href="https://www.biorxiv.org/content/10.1101/2024.05.03.592310v1">preprint</a>.</p>
+      <p>On this page, you can run starCAT on your own data. Your data is not uploaded anywhere — it stays on your computer and the python code runs right here in your web browser. Links to the results will appear when the job is finished. Click the links to download the results.</p>
+      <form id="dataForm">
+        <div class="form-group col-md-6">
+          <label for="ref">Select a starCAT reference catalog:</label>
+          <select name="ref" id="ref" class="form-control">
+            <option value="TCAT.V1" selected>TCAT.V1</option>
+          </select>
+        </div>
+        <div class="form-group col-md-6">
+          <label for="file">Select an h5ad file (smaller than 2 GB).</label>
+          <input type="file" name="file" id="file" class="form-control" required>
+        </div>
+        <button id="run-starcat" type="submit" class="d-none btn btn-primary mt-3">Run starCAT</button>
+      </form>
+      <div class="mt-4">
+        <div id="download-links"></div>
+      </div>
+      <div class="mt-4">
+        <pre class="bg-light" style="white-space: pre-wrap;" id="output"></pre>
+      </div>
+      <div id="vis"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/vega@5.30.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5.20.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6.26.0"></script>
+
+    <script type="text/javascript">
+
+      function convertData(data) {
+        const transformedData = []
+        data.forEach(obj => {
+          Object.keys(obj).forEach(key => {
+            transformedData.push({ key: key, value: obj[key] })
+          })
+        })
+        return transformedData
+      }
+
+//      const spec = {
+//        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+//        "repeat": ["Translation", "HLA", "ISG", "Mito", "Doublet-RBC", "gdT", "CellCycle-S", "Cytotoxic", "Doublet-Platelet", "NME1/FABP5", "Th22", "MAIT", "CellCycle-Late-S", "Cytoskeleton", "Heatshock", "Multi-Cytokine", "TEMRA", "Doublet-Myeloid", "Metallothionein", "CD4-CM", "IEG", "CD8-EM", "IEG2", "CD4-Naive", "Treg", "Th17-Resting", "Poor-Quality", "CD8-Naive", "RGCC/MYADM", "TIMD4/TIM3", "Doublet-Plasmablast", "BCL2/FAM13A", "IL10/IL19", "Th2-Activated", "Th2-Resting", "ICOS/CD38", "Doublet-Bcell", "Th1-Like", "CTLA4/CD38", "CD8-Trm", "Th17-Activated", "Tfh-2", "OX40/EBI3", "CD172a/MERTK", "IEG3", "Doublet-Fibroblast", "SOX4/TOX2", "CD40LG/TXNIP", "Tph", "Exhaustion", "Tfh-1"],
+//        "columns": 4,
+//        "spec": {
+//          "data": {"url": "starcat_usage.json"},
+//          "mark": "bar",
+//          "encoding": {
+//            "x": {"field": {"repeat": "repeat"}, "bin": {"maxbins": 30, "nice": true}},
+//            "y": {"aggregate": "count"}
+//          }
+//        },
+//        "config": {}
+//      }
+
+//      fetch('starcat_usage.json')
+//        .then(response => {
+//            if (!response.ok) {
+//              throw new Error('Network response was not ok ' + response.statusText)
+//            }
+//            return response.json() // Parse the JSON from the response
+//          })
+//          .then(data => {
+//            data = convertData(data)
+//            const spec = {
+//              "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+//              "title": "starCAT usage scores",
+//              "data": {"values": data},
+//              "mark": {
+//                "type": "boxplot",
+//                "extent": "min-max"
+//              },
+//              "encoding": {
+//                "y": {
+//                  "field": "key",
+//                  "type": "nominal",
+//                  "axis": { "title": null }
+//                  //"sort": {"op": "mean", "field": "value", "order": "descending"}
+//                },
+//                "x": {
+//                  "field": "value",
+//                  "type": "quantitative",
+//                  "axis": { "title": null },
+//                  "scale": {"zero": false}
+//                }
+//              }
+//            }
+//            vegaEmbed("#vis", spec, {mode: "vega-lite"}).then(console.log).catch(console.warn)
+//          })
+//          .catch(error => {
+//            console.error('There has been a problem with your fetch operation:', error)
+//          })
+
+
+    </script>
+
+    <script type="text/javascript">
+
+    const pyscript = `
+      import starcat
+      import pandas as pd
+      import os
+      import io
+      from js import ref, base_url, fileData
+      from pyodide.http import pyfetch
+      import anndata
+
+      print('Loading adata file')
+      file_data = io.BytesIO(bytearray(fileData))
+      adata = anndata.read_h5ad(file_data)
+      print(adata)
+
+      print(f'Downloading selected reference: {ref}')
+      response = await pyfetch(f'references/{ref}.zip')
+      await response.unpack_archive()
+
+      print('Running starCAT')
+      cat = starcat.starCAT(reference = ref, cachedir='.')
+      usage, scores = cat.fit_transform(adata)
+      print('starCAT completed successfully')
+
+      # Convert the first DataFrame to a CSV in memory
+      usage_buffer = io.BytesIO()
+      usage.to_csv(usage_buffer, sep='\t')
+      usage_buffer.seek(0)  # Rewind the buffer to the beginning
+      usage_bytes = usage_buffer.getvalue()
+
+      # Convert the second DataFrame to a CSV in memory
+      scores_buffer = io.BytesIO()
+      if scores is not None:
+          scores.to_csv(scores_buffer, sep='\t')
+      scores_buffer.seek(0)  # Rewind the buffer to the beginning
+      scores_bytes = scores_buffer.getvalue()
+
+      # Return both byte arrays to JavaScript
+      usage_bytes, scores_bytes
+    `
+
+    function plot_usage_data(usageData) {
+      const data = convertData(usageData)
+      const spec = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+        "title": "starCAT usage scores",
+        "data": {"values": data},
+        "mark": {
+          "type": "boxplot",
+          "extent": "min-max"
+        },
+        "encoding": {
+          "y": {
+            "field": "key",
+            "type": "nominal",
+            "axis": { "title": null }
+            //"sort": {"op": "mean", "field": "value", "order": "descending"}
+          },
+          "x": {
+            "field": "value",
+            "type": "quantitative",
+            "axis": { "title": null },
+            "scale": {"zero": false}
+          }
+        }
+      }
+      vegaEmbed("#vis", spec, {mode: "vega-lite"}).then(console.log).catch(console.warn)
+    }
+
+    function stdout_func(x) {
+      document.getElementById('output').innerText += '\n' + x
+    }
+
+    function tsv_data(tsvString, rowNames = true) {
+      // Split the TSV string into an array of rows
+      const rows = tsvString.trim().split('\n')
+      // Split the first row (header) to get the column names
+      const headers = rows[0].split('\t')
+      if (rowNames) {
+        headers[0] = 'rowname_Label'
+      }
+      // Process each remaining row
+      const data = rows.slice(1).map(row => {
+        const values = row.split('\t')
+        const obj = {}
+        // Map each value to the corresponding column name
+        headers.forEach((header, index) => {
+          // Convert strings to numbers
+          if (!(header.includes('_binary') || header.includes('_Label'))) {
+            obj[header] = +values[index]
+          } else {
+            obj[header] = values[index]
+          }
+        })
+        return obj
+      })
+      return data
+    }
+
+    function readBlobAsText(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        // On successful reading, resolve the promise with the result
+        reader.onload = function(event) {
+          resolve(event.target.result)
+        }
+        // In case of error, reject the promise with the error
+        reader.onerror = function(error) {
+          reject(error)
+        }
+        // Start reading the Blob as text
+        reader.readAsText(blob)
+      })
+    }
+
+    function show_results([usage_bytes, score_bytes]) {
+      const links = document.getElementById('download-links')
+      links.innerHTML = ''
+      const node = document.createElement('div')
+      node.innerHTML = 'Download the results:'
+      links.appendChild(node)
+      // Convert the first file's byte array to a Blob and trigger download
+      const usageBlob = new Blob([new Uint8Array(usage_bytes)], { type: 'text/tab-separated-values' })
+      const usageUrl = URL.createObjectURL(usageBlob)
+      const usageLink = document.createElement('a')
+      usageLink.className = 'mx-3'
+      usageLink.href = usageUrl
+      usageLink.innerText = 'starcat_results_usage.tsv'
+      usageLink.download = 'starcat_results_usage.tsv'
+      links.appendChild(usageLink)
+      //usageLink.click()
+      //document.body.removeChild(usageLink)
+      //URL.revokeObjectURL(usageUrl)  // Clean up
+      // Convert the second file's byte array to a Blob and trigger download
+      const scoreBlob = new Blob([new Uint8Array(score_bytes)], { type: 'text/tab-separated-values' })
+      const scoreUrl = URL.createObjectURL(scoreBlob)
+      const scoreLink = document.createElement('a')
+      scoreLink.className = 'mx-3'
+      scoreLink.href = scoreUrl
+      scoreLink.innerText = 'starcat_results_scores.tsv'
+      scoreLink.download = 'starcat_results_scores.tsv'
+      links.appendChild(scoreLink)
+      //scoreLink.click()
+      //document.body.removeChild(scoreLink)
+      //URL.revokeObjectURL(scoreLink)  // Clean up
+
+      readBlobAsText(usageBlob)
+      .then(usageString => {
+        //console.log(usageString)  // The TSV string content
+        usageData = tsv_data(usageString)
+        //console.log(usageData)  // The TSV string content
+        plot_usage_data(usageData)
+      })
+      .catch(error => {
+        console.error('Error reading the Blob as text:', error);
+      })
+
+    }
+
+    function log_status(mystring) {
+      console.log(mystring)
+      document.getElementById('output').innerText += '\n' + mystring
+    }
+
+    window.onload = async function() {
+      try {
+
+        log_status('Loading pyodide...')
+        let pyodide = await loadPyodide({stdout: stdout_func})
+
+        log_status('Loading micropip...')
+        await pyodide.loadPackage("micropip")
+
+        try {
+          log_status('Loading starcatpy...')
+          const micropip = pyodide.pyimport("micropip")
+          await micropip.install('starcatpy', keep_going=true)
+        } catch (error) {
+          console.error("An error occurred:", error)
+          output.innerText = "An error occurred: " + error.message
+        }
+
+        // Now we are ready to run starcat
+        document.getElementById('output').innerText = ''
+        document.getElementById("run-starcat").classList.remove("d-none")
+
+        // Run starcat when the form is submitted
+        document.getElementById('dataForm').addEventListener('submit', function(event) {
+          event.preventDefault()
+					document.getElementById('run-starcat').disabled = true
+          log_status("Launching starCAT...")
+          // python has access to: ref, base_url, fileData
+          ref = document.getElementById('ref').value
+          console.log("Selected Reference:", ref)
+          fileInput = document.getElementById('file')
+          file = fileInput.files[0]  // Get the file object
+          base_url = window.location.origin
+          if (file) {
+            console.log("File Name:", file.name)
+            console.log("File Size:", file.size, "bytes")
+          } else {
+            console.log("No file selected")
+          }
+          reader = new FileReader()
+          reader.onload = async function(event) {
+            fileData = new Uint8Array(event.target.result)
+            pyodide.runPythonAsync(pyscript).then(show_results)
+          }
+          reader.readAsArrayBuffer(file)
+				  // Re-enable the button to allow running a new job
+					document.getElementById('run-starcat').disabled = false
+        })
+
+      } catch (error) {
+        console.error("An error occurred:", error)
+        output.innerText = "An error occurred: " + error.message
+      }
+    }
+    </script>
+
+  </body>
+</html>
