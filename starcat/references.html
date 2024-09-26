@@ -45,62 +45,88 @@
     </div>
 
     <script type="text/javascript">
-        function log_status(mystring) {
-        console.log(mystring)
-        document.getElementById('output').innerText += '\n' + mystring
-        }
 
-        async function main() {
+        // Fetch the TSV data
+        async function fetchTSV() {
             try {
-                log_status("Loading Pyodide...");
-                let pyodide = await loadPyodide();
-
-                log_status("Loading pandas...");
-                await pyodide.loadPackage('pandas');
-
-                // Use JavaScript's fetch to download the CSV content
-                log_status("Downloading reference table...");
                 const response = await fetch('https://raw.githubusercontent.com/immunogenomics/starCAT/main/src/starcat/current_references.tsv');
-                const ref_tsv = await response.text();
-
-                // Send the CSV data to Pyodide's Python environment
-                pyodide.globals.set('ref_tsv', ref_tsv);
-
-                // Python code to manipulate the data and generate the table HTML
-                const pythonCode = `
-import pandas as pd
-from io import StringIO
-
-reference_data = pd.read_csv(StringIO(ref_tsv), sep='\\t', comment='#')
-
-# Modify 'Download' and 'Description' columns
-reference_data['Download'] = ''
-for i in reference_data.index:
-    reference_data.at[i, 'Download'] = f'<a href="{reference_data.at[i, "Link"]}.tar.gz">Download</a>'
-    publink = f'<a href="{reference_data.at[i, "Publication_Link"]}">publication</a>'
-    reference_data.at[i, 'Description'] = reference_data.at[i, 'Description'].replace('publication', publink)
-    zenodolink = f'<a href="{reference_data.at[i, "Link"]}">{reference_data.at[i, "Name"]}</a>'
-    reference_data.at[i, 'Name'] = zenodolink
-
-# Filter the columns we need for the table
-cols = ['Name', 'Cell_Type', 'Tissue', 'Species', 'Contexts', 'Description', 'Download']
-table_html = reference_data[cols].to_html(classes="table table-striped table-hover", index=False, escape=False)
-table_html
-                `;
-
-                const tableHtml = await pyodide.runPythonAsync(pythonCode);
-                
-                // Insert the generated table into the HTML
-                document.getElementById('references-table').innerHTML = tableHtml;
-                document.getElementById('output').innerText = ''
-
+                const tsvData = await response.text();
+                parseTSV(tsvData);
             } catch (error) {
-                log_status("An error occurred:", error);
+                console.error("Error fetching the TSV file:", error);
             }
         }
 
-        // Initialize the Pyodide and run the main function
-        main();
+        // Parse the TSV into an array of objects
+        function parseTSV(tsvData) {
+            // Trim, filter double quotations, split lines
+            const rows = tsvData.trim().replace(/"/g, '').split('\n');
+
+            // Skip rows that start with '#' (comments)
+            const dataRows = rows.filter(row => !row.startsWith('#'));
+
+            const headers = dataRows[0].trim().split('\t');
+            console.log(headers)
+
+            // Parse each row into an object with keys as headers
+            const data = dataRows.slice(1).map(row => {
+                const values = row.split('\t');
+                return headers.reduce((obj, header, i) => {
+                    obj[header] = values[i];
+                    return obj;
+                }, {});
+            });
+
+            // Manipulate the data as per the Python script
+            processTableData(data);
+        }
+
+        // Process the data (add download links and description)
+        function processTableData(data) {
+            const table = document.getElementById('references-table');
+            
+            // Define the columns you want to display
+            const cols = ['Name', 'Cell_Type', 'Tissue', 'Species', 'Contexts', 'Description', 'Download'];
+
+            // Create table headers
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            cols.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Create table body
+            const tbody = document.createElement('tbody');
+
+            data.forEach(row => {
+                // Create download and description links
+                const downloadLink = `<a href="${row['Link']}">Download</a>`;
+                const publink = `<a href="${row['Publication_Link']}">publication</a>`;
+                row['Description'] = row['Description'].replace('publication', publink);
+                const zenodolink = `<a href="${row['Link']}">${row['Name']}</a>`;
+                row['Name'] = zenodolink;
+                row['Download'] = downloadLink;
+
+                // Create table row
+                const tr = document.createElement('tr');
+                cols.forEach(col => {
+                    const td = document.createElement('td');
+                    td.innerHTML = row[col] || ''; // Use innerHTML to allow HTML content
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+        }
+
+        // Start fetching and building the table on page load
+        fetchTSV();
+
     </script>
+
 </body>
 </html>
