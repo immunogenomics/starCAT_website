@@ -38,7 +38,17 @@
           </select>
         </div>
         <div class="form-group col-md-6">
-          <label for="file">Select an h5ad file (smaller than 2 GB).</label>
+          <label for="file">Select an h5ad file (smaller than ~50,000 cells or 700 MB).</label>
+          <a href="#" id="tooltip-link" class="tooltip-trigger">See tips:</a>
+          <div id="custom-tooltip" class="custom-tooltip">
+              <ul>
+                  <li>To reduce dataset size, make sure counts matrix is saved in sparse format.</li>
+                  <li>If dataset is too large, data can be chunked and run in smaller batches (i.e. 50,000 cells at a time). 
+                    Alternatively, run larger datasets using python or command line via our software on <a href="https://github.com/immunogenomics/starcat">GitHub</a>.</li>
+                  <li>Try downloading an example dataset <a href="https://zenodo.org/records/13368041/files/COMBAT-CITESeq-DATA.Raw.T.ADTfixed20230831FiltForcNMF.Downsampled.h5ad">here</a>.</li>
+                  <li>Please let us know of any issues on our <a href="https://github.com/immunogenomics/starcat/issues">GitHub</a>.</li>
+              </ul>
+          </div>
           <input type="file" name="file" id="file" class="form-control" required>
         </div>
         <button id="run-starcat" type="submit" class="d-none btn btn-primary mt-3">Run starCAT</button>
@@ -58,6 +68,45 @@
     <script src="https://cdn.jsdelivr.net/npm/vega@5.30.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/vega-lite@5.20.1"></script>
     <script src="https://cdn.jsdelivr.net/npm/vega-embed@6.26.0"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tooltipLink = document.getElementById('tooltip-link');
+            const tooltipBox = document.getElementById('custom-tooltip');
+
+            function showTooltip() {
+                const rect = tooltipLink.getBoundingClientRect();
+                tooltipBox.style.left = `${rect.left}px`;
+                tooltipBox.style.top = `${rect.bottom + window.scrollY}px`;
+                tooltipBox.classList.add('active');
+            }
+
+            function hideTooltip() {
+                tooltipBox.classList.remove('active');
+            }
+
+            tooltipLink.addEventListener('mouseenter', showTooltip);
+            tooltipLink.addEventListener('mouseleave', hideTooltip);
+            tooltipBox.addEventListener('mouseenter', showTooltip);
+            tooltipBox.addEventListener('mouseleave', hideTooltip);
+        });
+    </script>
+    <style>
+      .custom-tooltip {
+          display: none;
+          position: absolute;
+          background-color: #fff;
+          border: 1px solid #ccc;
+          padding: 10px;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          z-index: 1000;
+          width: 500px; /* Adjust width to make it smaller */
+          padding-bottom: 0px; /* Reduce or remove bottom padding */
+      }
+      .custom-tooltip.active {
+          display: block;
+      }
+  </style>
 
     <script type="text/javascript">
 
@@ -135,14 +184,27 @@
       import pandas as pd
       import os
       import io
+      import gc
       from js import ref, base_url, fileData
       from pyodide.http import pyfetch
       import anndata
+
+      import tracemalloc
+      tracemalloc.start()
+
+      limit_mb=750
+      def check_memory():
+          current, peak = tracemalloc.get_traced_memory()
+          print(f"Data size: {current / 1024**2:.2f} MB")
+          return current / 1024**2
 
       print('Loading adata file')
       file_data = io.BytesIO(bytearray(fileData))
       adata = anndata.read_h5ad(file_data)
       print(adata)
+      del file_data
+      gc.collect()
+      current = check_memory()
 
       print(f'Downloading selected reference: {ref}')
       response = await pyfetch(f'references/{ref}.zip')
@@ -152,6 +214,8 @@
       cat = starcat.starCAT(reference = ref, cachedir='.')
       usage, scores = cat.fit_transform(adata)
       print('starCAT completed successfully')
+      del adata
+      gc.collect()
 
       # Convert the first DataFrame to a CSV in memory
       usage_buffer = io.BytesIO()
@@ -168,6 +232,7 @@
 
       # Return both byte arrays to JavaScript
       usage_bytes, scores_bytes
+
     `
     async function populateReferences() {
         try {
@@ -372,7 +437,12 @@
           reader = new FileReader()
           reader.onload = async function(event) {
             fileData = new Uint8Array(event.target.result)
-            pyodide.runPythonAsync(pyscript).then(show_results)
+            pyodide.runPythonAsync(pyscript)
+          .then(show_results)
+          .catch(error => {
+            console.error("An error occurred during the Python execution:", error);
+            log_status("An error occurred during the Python execution: " + error.message);
+          });
           }
           reader.readAsArrayBuffer(file)
 				  // Re-enable the button to allow running a new job
@@ -381,7 +451,7 @@
 
       } catch (error) {
         console.error("An error occurred:", error)
-        output.innerText = "An error occurred: " + error.message
+        log_status("An error occurred: " + error.message)
       }
     }
     </script>
