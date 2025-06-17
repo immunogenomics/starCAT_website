@@ -37,7 +37,16 @@
           <select name="ref" id="ref" class="form-control">
           </select>
         </div>
+
         <div class="form-group col-md-6">
+          <label for="language">Select file type:</label>
+          <select name="language" id="language" class="form-control">
+              <option value="python">1 H5AD file</option>
+              <option value="r">3 files: Matrix, Features, Barcodes</option>
+          </select>
+        </div>
+
+        <div id="python-upload" class="form-group col-md-6">
           <label for="file">Select an h5ad file (smaller than ~50,000 cells or 700 MB).</label>
           <a href="#" id="tooltip-link" class="tooltip-trigger">See tips:</a>
           <div id="custom-tooltip" class="custom-tooltip">
@@ -45,12 +54,20 @@
                   <li>To reduce dataset size, make sure counts matrix is saved in sparse format.</li>
                   <li>If dataset is too large, data can be chunked and run in smaller batches (i.e. 50,000 cells at a time). 
                     Alternatively, run larger datasets using python or command line via our software on <a href="https://github.com/immunogenomics/starcat">GitHub</a>.</li>
-                  <li>Try downloading an example dataset <a href="https://zenodo.org/records/13368041/files/COMBAT-CITESeq-DATA.Raw.T.ADTfixed20230831FiltForcNMF.Downsampled.h5ad">here</a>.</li>
+                  <li>Try downloading an example h5ad dataset <a href="https://zenodo.org/records/13368041/files/COMBAT-CITESeq-DATA.Raw.T.ADTfixed20230831FiltForcNMF.Downsampled.h5ad">here</a>.</li>
                   <li>Please let us know of any issues on our <a href="https://github.com/immunogenomics/starcat/issues">GitHub</a>.</li>
               </ul>
           </div>
-          <input type="file" name="file" id="file" class="form-control" required>
+          <input type="file" name="file" id="file" class="form-control">
         </div>
+
+        <div id="r-upload" class="form-group col-md-6" style="display: none;">
+            <label>Upload files:</label>
+            <input type="file" name="matrix" id="matrix" class="form-control">
+            <input type="file" name="features" id="features" class="form-control mt-2">
+            <input type="file" name="barcodes" id="barcodes" class="form-control mt-2">
+        </div>
+
         <button id="run-starcat" type="submit" class="d-none btn btn-primary mt-3">Run starCAT</button>
       </form>
       <div class="mt-4">
@@ -91,6 +108,33 @@
             tooltipBox.addEventListener('mouseleave', hideTooltip);
         });
     </script>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+          const languageSelect = document.getElementById('language');
+          const pythonUpload = document.getElementById('python-upload');
+          const rUpload = document.getElementById('r-upload');
+      
+          // Function to toggle the file inputs
+          function toggleUploadFields() {
+              if (languageSelect.value === 'python') {
+                  pythonUpload.style.display = 'block';
+                  rUpload.style.display = 'none';
+              } else {
+                  pythonUpload.style.display = 'none';
+                  rUpload.style.display = 'block';
+              }
+          }
+      
+          // Listen for dropdown changes
+          languageSelect.addEventListener('change', toggleUploadFields);
+      
+          // Initial check in case the form is pre-filled
+          toggleUploadFields();
+      });
+      </script>
+
+
     <style>
       .custom-tooltip {
           display: none;
@@ -185,7 +229,7 @@
       import os
       import io
       import gc
-      from js import ref, base_url, fileData
+      from js import ref, fileData
       from pyodide.http import pyfetch
       import anndata
 
@@ -198,12 +242,31 @@
           print(f"Data size: {current / 1024**2:.2f} MB")
           return current / 1024**2
 
-      print('Loading adata file')
-      file_data = io.BytesIO(bytearray(fileData))
-      adata = anndata.read_h5ad(file_data)
+      # Convert Uint8Array to bytes in Python
+      if 'h5ad' in file_data:
+          h5ad_bytes = io.BytesIO(bytearray(fileData['h5ad']))  # For Python processing
+          adata = anndata.read_h5ad(file_data)
+          del file_data
+          gc.collect()
+      else:
+          matrix_bytes = io.BytesIO(bytearray(fileData['matrix']))
+          features_bytes = io.BytesIO(bytearray(fileData['features']))
+          barcodes_bytes = io.BytesIO(bytearray(fileData['barcodes']))
+
+          matrix = scipy.io.mmread(io.BytesIO(bytearray(fileData['matrix']))).tocsr()  # Convert to CSR format
+          features = pd.read_csv(io.BytesIO(bytearray(fileData['features'])), header=None, sep="\t")
+          barcodes = pd.read_csv(io.BytesIO(bytearray(fileData['barcodes'])), header=None, sep="\t")
+
+          del file_data
+          gc.collect()
+          
+          adata = sc.AnnData(matrix)
+          adata.var_names = features[0].values  # Assuming first column contains gene names
+          adata.obs_names = barcodes[0].values  # Assuming first column contains barcode names
+          del matrix
+          gc.collect()
+
       print(adata)
-      del file_data
-      gc.collect()
       current = check_memory()
 
       print(f'Downloading selected reference: {ref}')
@@ -417,36 +480,80 @@
         document.getElementById('output').innerText = ''
         document.getElementById("run-starcat").classList.remove("d-none")
 
+
         // Run starcat when the form is submitted
         document.getElementById('dataForm').addEventListener('submit', function(event) {
           event.preventDefault()
 					document.getElementById('run-starcat').disabled = true
           log_status("Launching starCAT...")
-          // python has access to: ref, base_url, fileData
+          // python has access to: ref, fileData
           ref = document.getElementById('ref').value
           console.log("Selected Reference:", ref)
-          fileInput = document.getElementById('file')
-          file = fileInput.files[0]  // Get the file object
-          base_url = window.location.origin
-          if (file) {
-            console.log("File Name:", file.name)
-            console.log("File Size:", file.size, "bytes")
+
+          let fileData = {};
+          language = document.getElementById('language').value;
+
+          if (language === 'python') {
+              const file = document.getElementById('file').files[0];
+              if (!file) console.log('Please select an H5AD file.');
+              fileData['h5ad'] = file.arrayBuffer();
           } else {
-            console.log("No file selected")
+              const matrixFile = document.getElementById('matrix').files[0];
+              const featuresFile = document.getElementById('features').files[0];
+              const barcodesFile = document.getElementById('barcodes').files[0];
+
+              if (!matrixFile || ! featuresFile || !barcodesFile) {
+                  console.log('Please upload all three files.');
+              }
+
+              fileData['matrix'] = matrixFile.arrayBuffer();
+              fileData['features'] = featuresFile.arrayBuffer();
+              fileData['barcodes'] = barcodesFile.arrayBuffer();
           }
+
+          // Convert fileData buffers into Uint8Arrays
+          for (const key in fileData) {
+                fileData[key] = new Uint8Array(fileData[key]);
+          }
+
           reader = new FileReader()
           reader.onload = async function(event) {
-            fileData = new Uint8Array(event.target.result)
-            pyodide.runPythonAsync(pyscript)
-          .then(show_results)
-          .catch(error => {
-            console.error("An error occurred during the Python execution:", error);
-            log_status("An error occurred during the Python execution: " + error.message);
-          });
+            try {
+              const result = await pyodide.runPythonAsync(pyscript);
+              if (typeof result === 'string') {  // If an error traceback is returned
+                  log_status("Error occurred:\n" + result);
+              } else {
+                  show_results(result)}
+            } catch (error) {
+                log_status("An unexpected error occurred:\n" + error);
+            }
           }
           reader.readAsArrayBuffer(file)
 				  // Re-enable the button to allow running a new job
 					document.getElementById('run-starcat').disabled = false
+
+
+          // fileInput = document.getElementById('file')
+          // file = fileInput.files[0]  // Get the file object
+          // if (file) {
+          //   console.log("File Name:", file.name)
+          //   console.log("File Size:", file.size, "bytes")
+          // } else {
+          //   console.log("No file selected")
+          // }
+          // reader = new FileReader()
+          // reader.onload = async function(event) {
+          //   fileData = new Uint8Array(event.target.result)
+          //   pyodide.runPythonAsync(pyscript)
+          // .then(show_results)
+          // .catch(error => {
+          //   console.error("An error occurred during the Python execution:", error);
+          //   log_status("An error occurred during the Python execution: " + error.message);
+          // });
+          // }
+          // reader.readAsArrayBuffer(file)
+				  // // Re-enable the button to allow running a new job
+					// document.getElementById('run-starcat').disabled = false
         })
 
       } catch (error) {
