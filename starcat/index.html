@@ -29,7 +29,7 @@
   
     <div class="container mt-3">
       <p class="lead">starCAT is an algorithm to annotate single-cell transcriptomes with pre-defined catalogs of reference
-      gene expression programs (GEPs). Read more about starCAT in our <a href="https://www.biorxiv.org/content/10.1101/2024.05.03.592310v1">preprint</a>.</p>
+      gene expression programs (GEPs). Read more about starCAT in our <a href="https://www.nature.com/articles/s41592-025-02793-1">manuscript</a>.</p>
       <p class = "lead">On this page, you can run starCAT on your own data. Your data is not uploaded anywhere — it stays on your computer and the python code runs right here in your web browser. Links to the results will appear when the job is finished. Click the links to download the results.</p>
       <form id="dataForm">
         <div class="form-group col-md-6">
@@ -39,10 +39,10 @@
         </div>
 
         <div class="form-group col-md-6">
-          <label for="language">Select file type:</label>
-          <select name="language" id="language" class="form-control">
-              <option value="python">1 H5AD file</option>
-              <option value="r">3 files: Matrix, Features, Barcodes</option>
+          <label for="filetype">Select file type:</label>
+          <select name="filetype" id="filetype" class="form-control">
+              <option value="h5ad">H5AD file</option>
+              <option value="mtx">3 Files: sparse matrix (.mtx), features (.tsv), barcodes (.tsv)</option>
           </select>
         </div>
 
@@ -111,13 +111,13 @@
 
     <script>
       document.addEventListener('DOMContentLoaded', function () {
-          const languageSelect = document.getElementById('language');
+          const languageSelect = document.getElementById('filetype');
           const pythonUpload = document.getElementById('python-upload');
           const rUpload = document.getElementById('r-upload');
       
           // Function to toggle the file inputs
           function toggleUploadFields() {
-              if (languageSelect.value === 'python') {
+              if (languageSelect.value === 'h5ad') {
                   pythonUpload.style.display = 'block';
                   rUpload.style.display = 'none';
               } else {
@@ -491,9 +491,9 @@
           console.log("Selected Reference:", ref)
 
           let fileData = {};
-          language = document.getElementById('language').value;
+          language = document.getElementById('filetype').value;
 
-          if (language === 'python') {
+          if (language === 'h5ad') {
               const file = document.getElementById('file').files[0];
               if (!file) console.log('Please select an H5AD file.');
               fileData['h5ad'] = file.arrayBuffer();
