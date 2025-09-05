@@ -405,16 +405,27 @@
         await pyodide.loadPackage("micropip")
 
         try {
-          log_status('Loading starcatpy...')
-          const micropip = pyodide.pyimport("micropip")
-          await micropip.install('starcatpy', keep_going=true)
+                      log_status('Loading anndata (pure Python version)...')
+            const micropip = pyodide.pyimport("micropip")
+            await micropip.install('anndata==0.8.0', keep_going=true)
+            log_status('Loading starcatpy...')
+            await micropip.install('starcatpy', keep_going=true)
+          log_status('starcatpy installation completed')
+          
+          // Test if starcat can be imported
+          try {
+            pyodide.runPython('import starcat; print("starcat import successful")')
+            log_status('starcat import test successful')
+          } catch (importError) {
+            log_status('starcat import test failed: ' + importError.message)
+          }
         } catch (error) {
           console.error("An error occurred:", error)
-          output.innerText = "An error occurred: " + error.message
+          log_status("Error installing starcatpy: " + error.message)
         }
 
         // Now we are ready to run starcat
-        document.getElementById('output').innerText = ''
+        document.getElementById('output').innerText = ''  // Keep setup logs visible
         document.getElementById("run-starcat").classList.remove("d-none")
 
         // Run starcat when the form is submitted
