@@ -232,6 +232,7 @@
       from js import ref, fileData
       from pyodide.http import pyfetch
       import anndata
+      import scipy.io
 
       import tracemalloc
       tracemalloc.start()
@@ -243,27 +244,27 @@
           return current / 1024**2
 
       # Convert Uint8Array to bytes in Python
-      if 'h5ad' in file_data:
-          h5ad_bytes = io.BytesIO(bytearray(fileData['h5ad']))  # For Python processing
-          adata = anndata.read_h5ad(file_data)
-          del file_data
+      if 'h5ad' in fileData.object_keys():
+          h5ad_bytes = io.BytesIO(bytearray(fileData['h5ad']))
+          adata = anndata.read_h5ad(h5ad_bytes)
+          del h5ad_bytes
           gc.collect()
       else:
           matrix_bytes = io.BytesIO(bytearray(fileData['matrix']))
           features_bytes = io.BytesIO(bytearray(fileData['features']))
           barcodes_bytes = io.BytesIO(bytearray(fileData['barcodes']))
 
-          matrix = scipy.io.mmread(io.BytesIO(bytearray(fileData['matrix']))).tocsr()  # Convert to CSR format
-          features = pd.read_csv(io.BytesIO(bytearray(fileData['features'])), header=None, sep="\t")
-          barcodes = pd.read_csv(io.BytesIO(bytearray(fileData['barcodes'])), header=None, sep="\t")
+          matrix = scipy.io.mmread(matrix_bytes).tocsr()  # Convert to CSR format
+          features = pd.read_csv(features_bytes, header=None, sep="\t")
+          barcodes = pd.read_csv(barcodes_bytes, header=None, sep="\t")
 
-          del file_data
+          del matrix_bytes, features_bytes, barcodes_bytes
           gc.collect()
-          
-          adata = sc.AnnData(matrix)
+
+          adata = anndata.AnnData(X=matrix.T)  # Transpose: genes as columns, cells as rows
           adata.var_names = features[0].values  # Assuming first column contains gene names
           adata.obs_names = barcodes[0].values  # Assuming first column contains barcode names
-          del matrix
+          del matrix, features, barcodes
           gc.collect()
 
       print(adata)
