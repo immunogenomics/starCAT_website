@@ -64,7 +64,7 @@ npx http-server
 If you use starCAT in your research, please cite:
 
 ```
-Kotliar, D., Curtis, M., Agnew, R. et al. Reproducible single-cell annotation of programs underlying T cell subsets, activation states and functions. Nat Methods 22, 1964–1980 (2025). https://doi.org/10.1038/s41592-025-02793-1
+Kotliar, D.*, Curtis, M.*, Agnew, R. et al. Reproducible single-cell annotation of programs underlying T cell subsets, activation states and functions. Nat Methods 22, 1964–1980 (2025). https://doi.org/10.1038/s41592-025-02793-1
 ```
 
 ## Related Resources
