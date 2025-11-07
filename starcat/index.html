@@ -37,20 +37,46 @@
           <select name="ref" id="ref" class="form-control">
           </select>
         </div>
+
         <div class="form-group col-md-6">
+          <label for="filetype">Select file type:</label>
+          <select name="filetype" id="filetype" class="form-control">
+              <option value="h5ad">H5AD file</option>
+              <option value="mtx">MTX format (matrix.mtx, features.tsv, barcodes.tsv)</option>
+          </select>
+        </div>
+
+        <div id="h5ad-upload" class="form-group col-md-6">
           <label for="file">Select an h5ad file (smaller than ~50,000 cells or 700 MB).</label>
           <a href="#" id="tooltip-link" class="tooltip-trigger">See tips:</a>
           <div id="custom-tooltip" class="custom-tooltip">
               <ul>
                   <li>To reduce dataset size, make sure counts matrix is saved in sparse format.</li>
-                  <li>If dataset is too large, data can be chunked and run in smaller batches (i.e. 50,000 cells at a time). 
+                  <li>If dataset is too large, data can be chunked and run in smaller batches (i.e. 50,000 cells at a time).
                     Alternatively, run larger datasets using python or command line via our software on <a href="https://github.com/immunogenomics/starcat">GitHub</a>.</li>
-                  <li>Try downloading an example dataset <a href="https://zenodo.org/records/13368041/files/COMBAT-CITESeq-DATA.Raw.T.ADTfixed20230831FiltForcNMF.Downsampled.h5ad">here</a>.</li>
+                  <li>Try downloading an example h5ad dataset <a href="https://zenodo.org/records/13368041/files/COMBAT-CITESeq-DATA.Raw.T.ADTfixed20230831FiltForcNMF.Downsampled.h5ad">here</a>.</li>
                   <li>Please let us know of any issues on our <a href="https://github.com/immunogenomics/starcat/issues">GitHub</a>.</li>
               </ul>
           </div>
-          <input type="file" name="file" id="file" class="form-control" required>
+          <input type="file" name="file" id="file" class="form-control">
         </div>
+
+        <div id="mtx-upload" class="form-group col-md-6" style="display: none;">
+          <label>Upload MTX files:</label>
+          <div class="mb-2">
+            <label for="matrix" class="form-label">Matrix file (.mtx):</label>
+            <input type="file" name="matrix" id="matrix" class="form-control" accept=".mtx">
+          </div>
+          <div class="mb-2">
+            <label for="features" class="form-label">Features file (.tsv):</label>
+            <input type="file" name="features" id="features" class="form-control" accept=".tsv,.txt">
+          </div>
+          <div class="mb-2">
+            <label for="barcodes" class="form-label">Barcodes file (.tsv):</label>
+            <input type="file" name="barcodes" id="barcodes" class="form-control" accept=".tsv,.txt">
+          </div>
+        </div>
+
         <button id="run-starcat" type="submit" class="d-none btn btn-primary mt-3">Run starCAT</button>
       </form>
       <div class="mt-4">
@@ -91,6 +117,32 @@
             tooltipBox.addEventListener('mouseleave', hideTooltip);
         });
     </script>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+          const filetypeSelect = document.getElementById('filetype');
+          const h5adUpload = document.getElementById('h5ad-upload');
+          const mtxUpload = document.getElementById('mtx-upload');
+
+          // Function to toggle the file inputs
+          function toggleUploadFields() {
+              if (filetypeSelect.value === 'h5ad') {
+                  h5adUpload.style.display = 'block';
+                  mtxUpload.style.display = 'none';
+              } else {
+                  h5adUpload.style.display = 'none';
+                  mtxUpload.style.display = 'block';
+              }
+          }
+
+          // Listen for dropdown changes
+          filetypeSelect.addEventListener('change', toggleUploadFields);
+
+          // Initial state (show H5AD by default)
+          toggleUploadFields();
+      });
+    </script>
+
     <style>
       .custom-tooltip {
           display: none;
@@ -188,6 +240,7 @@
       from js import ref, base_url, fileData
       from pyodide.http import pyfetch
       import anndata
+      import scipy.io
 
       import tracemalloc
       tracemalloc.start()
@@ -198,12 +251,42 @@
           print(f"Data size: {current / 1024**2:.2f} MB")
           return current / 1024**2
 
-      print('Loading adata file')
-      file_data = io.BytesIO(bytearray(fileData))
-      adata = anndata.read_h5ad(file_data)
+      # Convert JsProxy to Python dict for easier access
+      file_dict = fileData.to_py()
+
+      # Check which file format we have
+      if 'h5ad' in file_dict:
+          print('Loading H5AD file')
+          h5ad_bytes = io.BytesIO(bytearray(file_dict['h5ad']))
+          adata = anndata.read_h5ad(h5ad_bytes)
+          del h5ad_bytes
+          gc.collect()
+      else:
+          print('Loading MTX files')
+          matrix_bytes = io.BytesIO(bytearray(file_dict['matrix']))
+          features_bytes = io.BytesIO(bytearray(file_dict['features']))
+          barcodes_bytes = io.BytesIO(bytearray(file_dict['barcodes']))
+
+          # Read the sparse matrix
+          matrix = scipy.io.mmread(matrix_bytes).tocsr()
+          features = pd.read_csv(features_bytes, header=None, sep="\t")
+          barcodes = pd.read_csv(barcodes_bytes, header=None, sep="\t")
+
+          del matrix_bytes, features_bytes, barcodes_bytes
+          gc.collect()
+
+          # Create AnnData object
+          # MTX is typically genes x cells, AnnData expects cells x genes, so transpose
+          adata = anndata.AnnData(X=matrix.T)
+          adata.var_names = features[0].values  # First column contains gene names
+          adata.obs_names = barcodes[0].values  # First column contains cell barcodes
+
+          del matrix, features, barcodes
+          gc.collect()
+
+      del file_dict
+
       print(adata)
-      del file_data
-      gc.collect()
       current = check_memory()
 
       print(f'Downloading selected reference: {ref}')
@@ -429,35 +512,63 @@
         document.getElementById("run-starcat").classList.remove("d-none")
 
         // Run starcat when the form is submitted
-        document.getElementById('dataForm').addEventListener('submit', function(event) {
+        document.getElementById('dataForm').addEventListener('submit', async function(event) {
           event.preventDefault()
 					document.getElementById('run-starcat').disabled = true
           log_status("Launching starCAT...")
-          // python has access to: ref, base_url, fileData
-          ref = document.getElementById('ref').value
-          console.log("Selected Reference:", ref)
-          fileInput = document.getElementById('file')
-          file = fileInput.files[0]  // Get the file object
-          base_url = window.location.origin
-          if (file) {
-            console.log("File Name:", file.name)
-            console.log("File Size:", file.size, "bytes")
-          } else {
-            console.log("No file selected")
+
+          try {
+            // python has access to: ref, base_url, fileData
+            ref = document.getElementById('ref').value
+            base_url = window.location.origin
+            console.log("Selected Reference:", ref)
+
+            // Create fileData object (will be accessible from Python)
+            fileData = {};
+            const filetype = document.getElementById('filetype').value;
+
+            log_status("Reading files...")
+            if (filetype === 'h5ad') {
+                // H5AD format: single file
+                const file = document.getElementById('file').files[0];
+                if (!file) {
+                    log_status('Error: Please select an H5AD file.');
+                    document.getElementById('run-starcat').disabled = false;
+                    return;
+                }
+                console.log("H5AD File:", file.name, file.size, "bytes");
+                fileData['h5ad'] = new Uint8Array(await file.arrayBuffer());
+            } else {
+                // MTX format: three files
+                const matrixFile = document.getElementById('matrix').files[0];
+                const featuresFile = document.getElementById('features').files[0];
+                const barcodesFile = document.getElementById('barcodes').files[0];
+
+                if (!matrixFile || !featuresFile || !barcodesFile) {
+                    log_status('Error: Please upload all three MTX files (matrix, features, barcodes).');
+                    document.getElementById('run-starcat').disabled = false;
+                    return;
+                }
+
+                console.log("Matrix file:", matrixFile.name, matrixFile.size, "bytes");
+                console.log("Features file:", featuresFile.name, featuresFile.size, "bytes");
+                console.log("Barcodes file:", barcodesFile.name, barcodesFile.size, "bytes");
+
+                fileData['matrix'] = new Uint8Array(await matrixFile.arrayBuffer());
+                fileData['features'] = new Uint8Array(await featuresFile.arrayBuffer());
+                fileData['barcodes'] = new Uint8Array(await barcodesFile.arrayBuffer());
+            }
+
+            log_status("Files loaded. Running starCAT...")
+            const result = await pyodide.runPythonAsync(pyscript);
+            show_results(result);
+          } catch (error) {
+              console.error("An unexpected error occurred:", error);
+              log_status("An unexpected error occurred:\n" + error);
+          } finally {
+              // Re-enable the button to allow running a new job
+              document.getElementById('run-starcat').disabled = false;
           }
-          reader = new FileReader()
-          reader.onload = async function(event) {
-            fileData = new Uint8Array(event.target.result)
-            pyodide.runPythonAsync(pyscript)
-          .then(show_results)
-          .catch(error => {
-            console.error("An error occurred during the Python execution:", error);
-            log_status("An error occurred during the Python execution: " + error.message);
-          });
-          }
-          reader.readAsArrayBuffer(file)
-				  // Re-enable the button to allow running a new job
-					document.getElementById('run-starcat').disabled = false
         })
 
       } catch (error) {
