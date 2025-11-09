@@ -30,11 +30,8 @@ starCAT annotates single-cell RNA-seq data with predefined gene expression progr
 ### H5AD Format
 Standard AnnData format for single-cell data stored in HDF5 files.
 
-### MTX Format
-Matrix Market sparse matrix format with three components:
-- `.mtx` - Sparse count matrix
-- `features.tsv` - Gene/feature names
-- `barcodes.tsv` - Cell barcodes
+### CellRanger H5 Format
+H5 format output by CellRanger (e.g. filtered_feature_bc_matrix.h5) for users who want to avoid H5Ad
 
 ## Reference Catalogs
 
