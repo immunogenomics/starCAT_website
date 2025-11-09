@@ -37,20 +37,35 @@
           <select name="ref" id="ref" class="form-control">
           </select>
         </div>
+
         <div class="form-group col-md-6">
+          <label for="filetype">Select file type:</label>
+          <select name="filetype" id="filetype" class="form-control">
+              <option value="h5ad">H5AD file (AnnData format)</option>
+              <option value="10x_h5">CellRanger H5 (10x Genomics output)</option>
+          </select>
+        </div>
+
+        <div id="h5ad-upload" class="form-group col-md-6">
           <label for="file">Select an h5ad file (smaller than ~50,000 cells or 700 MB).</label>
           <a href="#" id="tooltip-link" class="tooltip-trigger">See tips:</a>
           <div id="custom-tooltip" class="custom-tooltip">
               <ul>
                   <li>To reduce dataset size, make sure counts matrix is saved in sparse format.</li>
-                  <li>If dataset is too large, data can be chunked and run in smaller batches (i.e. 50,000 cells at a time). 
+                  <li>If dataset is too large, data can be chunked and run in smaller batches (i.e. 50,000 cells at a time).
                     Alternatively, run larger datasets using python or command line via our software on <a href="https://github.com/immunogenomics/starcat">GitHub</a>.</li>
-                  <li>Try downloading an example dataset <a href="https://zenodo.org/records/13368041/files/COMBAT-CITESeq-DATA.Raw.T.ADTfixed20230831FiltForcNMF.Downsampled.h5ad">here</a>.</li>
+                  <li>Try downloading an example h5ad dataset <a href="https://zenodo.org/records/13368041/files/COMBAT-CITESeq-DATA.Raw.T.ADTfixed20230831FiltForcNMF.Downsampled.h5ad">here</a>.</li>
                   <li>Please let us know of any issues on our <a href="https://github.com/immunogenomics/starcat/issues">GitHub</a>.</li>
               </ul>
           </div>
-          <input type="file" name="file" id="file" class="form-control" required>
+          <input type="file" name="file" id="file" class="form-control" accept=".h5ad">
         </div>
+
+        <div id="10x-upload" class="form-group col-md-6" style="display: none;">
+          <label for="cellranger_file">Select CellRanger H5 file (filtered_feature_bc_matrix.h5 or similar)</label>
+          <input type="file" name="cellranger_file" id="cellranger_file" class="form-control" accept=".h5">
+        </div>
+
         <button id="run-starcat" type="submit" class="d-none btn btn-primary mt-3">Run starCAT</button>
       </form>
       <div class="mt-4">
@@ -91,6 +106,32 @@
             tooltipBox.addEventListener('mouseleave', hideTooltip);
         });
     </script>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+          const filetypeSelect = document.getElementById('filetype');
+          const h5adUpload = document.getElementById('h5ad-upload');
+          const tenxUpload = document.getElementById('10x-upload');
+
+          // Function to toggle the file inputs
+          function toggleUploadFields() {
+              if (filetypeSelect.value === 'h5ad') {
+                  h5adUpload.style.display = 'block';
+                  tenxUpload.style.display = 'none';
+              } else {
+                  h5adUpload.style.display = 'none';
+                  tenxUpload.style.display = 'block';
+              }
+          }
+
+          // Listen for dropdown changes
+          filetypeSelect.addEventListener('change', toggleUploadFields);
+
+          // Initial state (show H5AD by default)
+          toggleUploadFields();
+      });
+    </script>
+
     <style>
       .custom-tooltip {
           display: none;
@@ -185,7 +226,7 @@
       import os
       import io
       import gc
-      from js import ref, base_url, fileData
+      from js import ref, base_url, fileData, fileType
       from pyodide.http import pyfetch
       import anndata
 
@@ -198,12 +239,65 @@
           print(f"Data size: {current / 1024**2:.2f} MB")
           return current / 1024**2
 
-      print('Loading adata file')
-      file_data = io.BytesIO(bytearray(fileData))
-      adata = anndata.read_h5ad(file_data)
+      # Load data based on file type
+      if fileType == '10x_h5':
+          print('Loading CellRanger H5 file')
+
+          # Read 10x H5 format manually (avoid scanpy's heavy dependencies)
+          import h5py
+          import tempfile
+          import scipy.sparse as sp
+
+          # Write to temp file
+          with tempfile.NamedTemporaryFile(delete=False, suffix='.h5') as tmp:
+              tmp.write(bytearray(fileData))
+              tmp_path = tmp.name
+
+          print('Parsing 10x H5 structure...')
+          with h5py.File(tmp_path, 'r') as f:
+              # 10x H5 structure: matrix/data, matrix/indices, matrix/indptr, matrix/shape
+              # features/name, barcodes
+              matrix_group = f['matrix']
+
+              # Read sparse matrix components
+              data = matrix_group['data'][:]
+              indices = matrix_group['indices'][:]
+              indptr = matrix_group['indptr'][:]
+              shape = matrix_group['shape'][:]
+
+              # Create CSC sparse matrix (10x format)
+              matrix = sp.csc_matrix((data, indices, indptr), shape=shape)
+
+              # Read features and barcodes
+              features = [x.decode('utf-8') if isinstance(x, bytes) else x
+                         for x in matrix_group['features']['name'][:]]
+              barcodes = [x.decode('utf-8') if isinstance(x, bytes) else x
+                         for x in matrix_group['barcodes'][:]]
+
+          os.unlink(tmp_path)
+
+          # Create AnnData object (transpose: genes x cells -> cells x genes)
+          print('Creating AnnData object...')
+          adata = anndata.AnnData(X=matrix.T.tocsr())
+          adata.var_names = features
+          adata.obs_names = barcodes
+          print('CellRanger H5 file loaded successfully')
+      else:
+          print('Loading H5AD file')
+          file_data = io.BytesIO(bytearray(fileData))
+          adata = anndata.read_h5ad(file_data)
+          del file_data
+          gc.collect()
+
+      # Check for duplicate gene names and make unique if needed (applies to both formats)
+      if not adata.var_names.is_unique:
+          n_duplicates = len(adata.var_names) - len(adata.var_names.unique())
+          print(f'Warning: Found {n_duplicates} duplicate gene names')
+          print('Making gene names unique by adding suffixes (-1, -2, etc.)...')
+          adata.var_names_make_unique()
+          print('Gene names are now unique')
+
       print(adata)
-      del file_data
-      gc.collect()
       current = check_memory()
 
       print(f'Downloading selected reference: {ref}')
@@ -429,35 +523,49 @@
         document.getElementById("run-starcat").classList.remove("d-none")
 
         // Run starcat when the form is submitted
-        document.getElementById('dataForm').addEventListener('submit', function(event) {
+        document.getElementById('dataForm').addEventListener('submit', async function(event) {
           event.preventDefault()
 					document.getElementById('run-starcat').disabled = true
           log_status("Launching starCAT...")
-          // python has access to: ref, base_url, fileData
-          ref = document.getElementById('ref').value
-          console.log("Selected Reference:", ref)
-          fileInput = document.getElementById('file')
-          file = fileInput.files[0]  // Get the file object
-          base_url = window.location.origin
-          if (file) {
+
+          try {
+            // python has access to: ref, base_url, fileData, fileType
+            ref = document.getElementById('ref').value
+            base_url = window.location.origin
+            fileType = document.getElementById('filetype').value
+            console.log("Selected Reference:", ref)
+            console.log("Selected File Type:", fileType)
+
+            // Get the appropriate file based on type
+            let file;
+            if (fileType === 'h5ad') {
+              file = document.getElementById('file').files[0];
+            } else {
+              file = document.getElementById('cellranger_file').files[0];
+            }
+
+            if (!file) {
+              log_status('Error: Please select a file.');
+              document.getElementById('run-starcat').disabled = false;
+              return;
+            }
+
             console.log("File Name:", file.name)
             console.log("File Size:", file.size, "bytes")
-          } else {
-            console.log("No file selected")
+
+            log_status("Reading file...")
+            fileData = new Uint8Array(await file.arrayBuffer());
+
+            log_status("Files loaded. Running starCAT...")
+            const result = await pyodide.runPythonAsync(pyscript);
+            show_results(result);
+          } catch (error) {
+              console.error("An unexpected error occurred:", error);
+              log_status("An unexpected error occurred:\n" + error);
+          } finally {
+              // Re-enable the button to allow running a new job
+              document.getElementById('run-starcat').disabled = false;
           }
-          reader = new FileReader()
-          reader.onload = async function(event) {
-            fileData = new Uint8Array(event.target.result)
-            pyodide.runPythonAsync(pyscript)
-          .then(show_results)
-          .catch(error => {
-            console.error("An error occurred during the Python execution:", error);
-            log_status("An error occurred during the Python execution: " + error.message);
-          });
-          }
-          reader.readAsArrayBuffer(file)
-				  // Re-enable the button to allow running a new job
-					document.getElementById('run-starcat').disabled = false
         })
 
       } catch (error) {
