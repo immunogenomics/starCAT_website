@@ -301,7 +301,7 @@
       current = check_memory()
 
       print(f'Downloading selected reference: {ref}')
-      response = await pyfetch(f'references/{ref}.zip')
+      response = await pyfetch(f'references/{ref}.tar.gz')
       await response.unpack_archive()
 
       print('Running starCAT')
