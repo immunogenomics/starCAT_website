@@ -241,6 +241,7 @@
       from pyodide.http import pyfetch
       import anndata
       import scipy.io
+      import scipy.io._mmio
 
       import tracemalloc
       tracemalloc.start()
@@ -251,40 +252,51 @@
           print(f"Data size: {current / 1024**2:.2f} MB")
           return current / 1024**2
 
-      # Convert JsProxy to Python dict for easier access
-      file_dict = fileData.to_py()
+      # Access JsProxy using attribute access (not subscript)
+      print('Checking file format...')
 
-      # Check which file format we have
-      if 'h5ad' in file_dict:
+      # Check which file format we have by checking JavaScript object keys
+      has_h5ad = 'h5ad' in fileData.object_keys()
+
+      if has_h5ad:
           print('Loading H5AD file')
-          h5ad_bytes = io.BytesIO(bytearray(file_dict['h5ad']))
+          h5ad_bytes = io.BytesIO(bytearray(fileData.h5ad))
           adata = anndata.read_h5ad(h5ad_bytes)
           del h5ad_bytes
           gc.collect()
       else:
           print('Loading MTX files')
-          matrix_bytes = io.BytesIO(bytearray(file_dict['matrix']))
-          features_bytes = io.BytesIO(bytearray(file_dict['features']))
-          barcodes_bytes = io.BytesIO(bytearray(file_dict['barcodes']))
+          print('Creating BytesIO objects from JavaScript data...')
+          matrix_bytes = io.BytesIO(bytearray(fileData.matrix))
+          features_bytes = io.BytesIO(bytearray(fileData.features))
+          barcodes_bytes = io.BytesIO(bytearray(fileData.barcodes))
 
-          # Read the sparse matrix
-          matrix = scipy.io.mmread(matrix_bytes).tocsr()
+          # Read the sparse matrix (using internal _mmio to avoid threading issues)
+          print('Parsing MTX matrix file (this may take a while)...')
+          matrix_raw = scipy.io._mmio.MMFile().read(matrix_bytes)
+          print('Converting to CSR sparse format...')
+          matrix = matrix_raw.tocsr()
+          print('Matrix loaded successfully')
+
+          print('Reading features and barcodes files...')
           features = pd.read_csv(features_bytes, header=None, sep="\t")
           barcodes = pd.read_csv(barcodes_bytes, header=None, sep="\t")
+          print('Features and barcodes loaded')
 
-          del matrix_bytes, features_bytes, barcodes_bytes
+          del matrix_bytes, features_bytes, barcodes_bytes, matrix_raw
           gc.collect()
 
           # Create AnnData object
           # MTX is typically genes x cells, AnnData expects cells x genes, so transpose
+          print('Creating AnnData object (transposing matrix)...')
           adata = anndata.AnnData(X=matrix.T)
+          print('Assigning gene and cell names...')
           adata.var_names = features[0].values  # First column contains gene names
           adata.obs_names = barcodes[0].values  # First column contains cell barcodes
+          print('AnnData object created successfully')
 
           del matrix, features, barcodes
           gc.collect()
-
-      del file_dict
 
       print(adata)
       current = check_memory()
@@ -526,9 +538,11 @@
             // Create fileData object (will be accessible from Python)
             fileData = {};
             const filetype = document.getElementById('filetype').value;
+            console.log("File type selected:", filetype);
 
             log_status("Reading files...")
             if (filetype === 'h5ad') {
+                console.log("In H5AD branch");
                 // H5AD format: single file
                 const file = document.getElementById('file').files[0];
                 if (!file) {
@@ -539,10 +553,15 @@
                 console.log("H5AD File:", file.name, file.size, "bytes");
                 fileData['h5ad'] = new Uint8Array(await file.arrayBuffer());
             } else {
+                console.log("In MTX branch");
                 // MTX format: three files
+                console.log("Getting matrix input element...");
                 const matrixFile = document.getElementById('matrix').files[0];
+                console.log("Getting features input element...");
                 const featuresFile = document.getElementById('features').files[0];
+                console.log("Getting barcodes input element...");
                 const barcodesFile = document.getElementById('barcodes').files[0];
+                console.log("Got all file inputs");
 
                 if (!matrixFile || !featuresFile || !barcodesFile) {
                     log_status('Error: Please upload all three MTX files (matrix, features, barcodes).');
@@ -554,13 +573,24 @@
                 console.log("Features file:", featuresFile.name, featuresFile.size, "bytes");
                 console.log("Barcodes file:", barcodesFile.name, barcodesFile.size, "bytes");
 
+                console.log("Reading matrix file...");
                 fileData['matrix'] = new Uint8Array(await matrixFile.arrayBuffer());
+                console.log("Matrix file read complete");
+
+                console.log("Reading features file...");
                 fileData['features'] = new Uint8Array(await featuresFile.arrayBuffer());
+                console.log("Features file read complete");
+
+                console.log("Reading barcodes file...");
                 fileData['barcodes'] = new Uint8Array(await barcodesFile.arrayBuffer());
+                console.log("Barcodes file read complete");
             }
 
+            console.log("All files loaded, about to run Python...");
             log_status("Files loaded. Running starCAT...")
+            console.log("Calling pyodide.runPythonAsync...");
             const result = await pyodide.runPythonAsync(pyscript);
+            console.log("Python execution complete");
             show_results(result);
           } catch (error) {
               console.error("An unexpected error occurred:", error);
