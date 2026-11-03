@@ -167,113 +167,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script type="text/javascript">
 
-    const pyscript = `
-      import starcat
-      import pandas as pd
-      import os
-      import io
-      import gc
-      from js import ref, fileData, fileType
-      from pyodide.http import pyfetch
-      import anndata
+    // The analysis pipeline lives in starcat_web.py (streaming, bounded-memory); fetched once.
+    const pyscriptPromise = fetch('starcat_web.py').then(r => {
+      if (!r.ok) throw new Error('Could not load starcat_web.py (HTTP ' + r.status + ')')
+      return r.text()
+    })
 
-      import tracemalloc
-      tracemalloc.start()
-
-      def check_memory():
-          current, peak = tracemalloc.get_traced_memory()
-          print(f"Data size: {current / 1024**2:.2f} MB")
-          return current / 1024**2
-
-      # Load data based on file type
-      if fileType == '10x_h5':
-          print('Loading CellRanger H5 file')
-
-          # Read 10x H5 format manually (avoid scanpy's heavy dependencies)
-          import h5py
-          import tempfile
-          import scipy.sparse as sp
-
-          # Write to temp file
-          with tempfile.NamedTemporaryFile(delete=False, suffix='.h5') as tmp:
-              tmp.write(bytearray(fileData))
-              tmp_path = tmp.name
-
-          print('Parsing 10x H5 structure...')
-          with h5py.File(tmp_path, 'r') as f:
-              # 10x H5 structure: matrix/data, matrix/indices, matrix/indptr, matrix/shape
-              # features/name, barcodes
-              matrix_group = f['matrix']
-
-              # Read sparse matrix components
-              data = matrix_group['data'][:]
-              indices = matrix_group['indices'][:]
-              indptr = matrix_group['indptr'][:]
-              shape = matrix_group['shape'][:]
-
-              # Create CSC sparse matrix (10x format)
-              matrix = sp.csc_matrix((data, indices, indptr), shape=shape)
-
-              # Read features and barcodes
-              features = [x.decode('utf-8') if isinstance(x, bytes) else x
-                         for x in matrix_group['features']['name'][:]]
-              barcodes = [x.decode('utf-8') if isinstance(x, bytes) else x
-                         for x in matrix_group['barcodes'][:]]
-
-          os.unlink(tmp_path)
-
-          # Create AnnData object (transpose: genes x cells -> cells x genes)
-          print('Creating AnnData object...')
-          adata = anndata.AnnData(X=matrix.T.tocsr())
-          adata.var_names = features
-          adata.obs_names = barcodes
-          print('CellRanger H5 file loaded successfully')
-      else:
-          print('Loading H5AD file')
-          file_data = io.BytesIO(bytearray(fileData))
-          adata = anndata.read_h5ad(file_data)
-          del file_data
-          gc.collect()
-
-      # Check for duplicate gene names and make unique if needed (applies to both formats)
-      if not adata.var_names.is_unique:
-          n_duplicates = len(adata.var_names) - len(adata.var_names.unique())
-          print(f'Warning: Found {n_duplicates} duplicate gene names')
-          print('Making gene names unique by adding suffixes (-1, -2, etc.)...')
-          adata.var_names_make_unique()
-          print('Gene names are now unique')
-
-      print(adata)
-      current = check_memory()
-
-      print(f'Downloading selected reference: {ref}')
-      response = await pyfetch(f'references/{ref}.tar.gz')
-      await response.unpack_archive()
-
-      print('Running starCAT')
-      cat = starcat.starCAT(reference = ref, cachedir='.')
-      usage, scores = cat.fit_transform(adata)
-      print('starCAT completed successfully')
-      del adata
-      gc.collect()
-
-      # Convert the first DataFrame to a CSV in memory
-      usage_buffer = io.BytesIO()
-      usage.to_csv(usage_buffer, sep='\t')
-      usage_buffer.seek(0)  # Rewind the buffer to the beginning
-      usage_bytes = usage_buffer.getvalue()
-
-      # Convert the second DataFrame to a CSV in memory
-      scores_buffer = io.BytesIO()
-      if scores is not None:
-          scores.to_csv(scores_buffer, sep='\t')
-      scores_buffer.seek(0)  # Rewind the buffer to the beginning
-      scores_bytes = scores_buffer.getvalue()
-
-      # Return both byte arrays to JavaScript
-      usage_bytes, scores_bytes
-
-    `
     async function populateReferences() {
         try {
           const refurl = 'https://raw.githubusercontent.com/immunogenomics/starCAT/main/src/starcat/current_references.tsv';
@@ -367,64 +266,25 @@
       return data
     }
 
-    function readBlobAsText(blob) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        // On successful reading, resolve the promise with the result
-        reader.onload = function(event) {
-          resolve(event.target.result)
-        }
-        // In case of error, reject the promise with the error
-        reader.onerror = function(error) {
-          reject(error)
-        }
-        // Start reading the Blob as text
-        reader.readAsText(blob)
-      })
-    }
-
-    function show_results([usage_bytes, score_bytes]) {
+    function show_results(result) {
       const links = document.getElementById('download-links')
       links.innerHTML = ''
       const node = document.createElement('div')
-      node.innerHTML = 'Download the results:'
+      node.innerText = `Download the results (${result.n_cells.toLocaleString()} cells, ` +
+        `${result.n_genes_overlap} of ${result.n_genes_reference} reference genes, ${result.seconds} s):`
       links.appendChild(node)
-      // Convert the first file's byte array to a Blob and trigger download
-      const usageBlob = new Blob([new Uint8Array(usage_bytes)], { type: 'text/tab-separated-values' })
-      const usageUrl = URL.createObjectURL(usageBlob)
-      const usageLink = document.createElement('a')
-      usageLink.className = 'mx-3'
-      usageLink.href = usageUrl
-      usageLink.innerText = 'starcat_results_usage.tsv'
-      usageLink.download = 'starcat_results_usage.tsv'
-      links.appendChild(usageLink)
-      //usageLink.click()
-      //document.body.removeChild(usageLink)
-      //URL.revokeObjectURL(usageUrl)  // Clean up
-      // Convert the second file's byte array to a Blob and trigger download
-      const scoreBlob = new Blob([new Uint8Array(score_bytes)], { type: 'text/tab-separated-values' })
-      const scoreUrl = URL.createObjectURL(scoreBlob)
-      const scoreLink = document.createElement('a')
-      scoreLink.className = 'mx-3'
-      scoreLink.href = scoreUrl
-      scoreLink.innerText = 'starcat_results_scores.tsv'
-      scoreLink.download = 'starcat_results_scores.tsv'
-      links.appendChild(scoreLink)
-      //scoreLink.click()
-      //document.body.removeChild(scoreLink)
-      //URL.revokeObjectURL(scoreLink)  // Clean up
-
-      readBlobAsText(usageBlob)
-      .then(usageString => {
-        //console.log(usageString)  // The TSV string content
-        usageData = tsv_data(usageString)
-        //console.log(usageData)  // The TSV string content
-        plot_usage_data(usageData)
-      })
-      .catch(error => {
-        console.error('Error reading the Blob as text:', error);
-      })
-
+      const files = [['starcat_results_usage.tsv', result.usage_tsv]]
+      if (result.scores_tsv) files.push(['starcat_results_scores.tsv', result.scores_tsv])
+      for (const [name, text] of files) {
+        const blob = new Blob([text], { type: 'text/tab-separated-values' })
+        const link = document.createElement('a')
+        link.className = 'mx-3'
+        link.href = URL.createObjectURL(blob)
+        link.innerText = name
+        link.download = name
+        links.appendChild(link)
+      }
+      plot_usage_data(tsv_data(result.usage_tsv))
     }
 
     function log_status(mystring) {
@@ -479,9 +339,8 @@
           log_status("Launching starCAT...")
 
           try {
-            // python has access to: ref, fileData, fileType
-            ref = document.getElementById('ref').value
-            fileType = document.getElementById('filetype').value
+            const ref = document.getElementById('ref').value
+            const fileType = document.getElementById('filetype').value
             console.log("Selected Reference:", ref)
             console.log("Selected File Type:", fileType)
 
@@ -503,11 +362,23 @@
             console.log("File Size:", file.size, "bytes")
 
             log_status("Reading file...")
-            fileData = new Uint8Array(await file.arrayBuffer());
+            // The file goes into Pyodide's in-memory filesystem (JS memory, not the wasm heap)
+            // and starcat_web.py streams it from there with h5py.
+            pyodide.FS.writeFile('/data.h5ad', new Uint8Array(await file.arrayBuffer()))
+            pyodide.globals.set('DATA_PATH', '/data.h5ad')
+            pyodide.globals.set('FILE_TYPE', fileType)
+            pyodide.globals.set('REF', ref)
+            pyodide.globals.set('REF_BASE', new URL('references/', window.location.href).href)
 
-            log_status("Files loaded. Running starCAT...")
-            const result = await pyodide.runPythonAsync(pyscript);
-            show_results(result);
+            log_status("Running starCAT...")
+            try {
+              const proxy = await pyodide.runPythonAsync(await pyscriptPromise)
+              const result = proxy.toJs({dict_converter: Object.fromEntries})
+              proxy.destroy()
+              show_results(result)
+            } finally {
+              try { pyodide.FS.unlink('/data.h5ad') } catch (e) {}
+            }
           } catch (error) {
               console.error("An unexpected error occurred:", error);
               log_status("An unexpected error occurred:\n" + error);
