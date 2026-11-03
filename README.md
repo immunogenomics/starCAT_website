@@ -1,6 +1,6 @@
 # starCAT web application
 
-Run **starCAT** (*CellAnnoTator) on your own single-cell RNA-seq data directly in the browser:
+Run **starCAT** (star-CellAnnoTator) on your own single-cell RNA-seq data directly in the browser:
 https://immunogenomics.io/starcat/
 
 starCAT annotates single-cell transcriptomes with curated catalogs of reference gene expression
