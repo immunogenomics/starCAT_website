@@ -1,71 +1,80 @@
-# starCAT Web Application
+# starCAT web application
 
-A privacy-preserving web application for running **starCAT** (star-CellAnnoTator) directly in your browser.
+Run **starCAT** (*CellAnnoTator) on your own single-cell RNA-seq data directly in the browser:
+https://immunogenomics.io/starcat/
 
-## Overview
+starCAT annotates single-cell transcriptomes with curated catalogs of reference gene expression
+programs (GEPs) and derives discrete annotations such as cell type, proliferation and activation
+state. This site runs the published [`starcatpy`](https://pypi.org/project/starcatpy/) package
+inside the browser with [Pyodide](https://pyodide.org) (Python compiled to WebAssembly), so data
+never leaves the user's machine and there is no server-side compute.
 
-starCAT annotates single-cell RNA-seq data with predefined gene expression programs and  infers derived discrete annotations such as cell type labels. This web implementation uses **Pyodide** (Python compiled to WebAssembly) to run the complete starCAT algorithm entirely in your browser.
+## Using the site
 
-## Key Features
+1. Choose a reference catalog (see the [References](https://immunogenomics.io/starcat/references.html) page).
+2. Select a counts file: an **H5AD** (AnnData) file or a **CellRanger H5** file
+   (`filtered_feature_bc_matrix.h5`). Counts must be raw UMI counts with gene symbols as gene names.
+3. Click **Run starCAT**. Results appear on the page with download links for
+   `starcat_usage.tsv` (normalised program usage per cell) and `starcat_scores.tsv`
+   (derived scores and labels), plus summary charts.
 
-- **Complete Privacy**: All computation happens client-side - your data never leaves your machine
-- **No Installation Required**: Run sophisticated bioinformatics analysis directly in your browser
-- **Multiple Input Formats**: Takes raw count data in both H5AD (AnnData) and MTX (Matrix Market) file formats
-- **Curated Reference Catalogs**: Access to pre-built reference datasets for various tissues and species
-- **Zero Infrastructure**: No backend servers or API limits
+An example dataset (15,000 T cells, 55 MB) is linked from the page.
 
-## Quick Start
+## How the site works
 
-1. **Visit the application** (https://immunogenomics.io/starcat)
-2. **Select a reference catalog** from the dropdown menu
-3. **Choose your file format** (H5AD or MTX)
-4. **Upload your data**:
-   - H5AD: Single `.h5ad` file (up to ~50,000 cells or 700MB)
-   - MTX: Three files (matrix, features, barcodes)
-5. **Click "Run starCAT"** and wait for processing
-6. **Download results**: Two TSV files (usage scores and detailed scores) plus interactive visualizations
+| File | Role |
+|---|---|
+| `starcat/index.html` | The page: form, progress, results and charts (Bootstrap + Vega-Lite). |
+| `starcat/starcat-worker.js` | Web Worker that loads Pyodide, installs `anndata` and `starcatpy`, and runs the pipeline off the main thread so the page stays responsive. |
+| `starcat/starcat_web.py` | The analysis pipeline, executed by Pyodide. |
+| `starcat/references.html` | Table of available reference catalogs. |
+| `starcat/references/` | Reference tarballs served to the browser (not in git; see below). |
+| `download_references.py` | Downloads the reference tarballs listed in `current_references.tsv` into `starcat/references/`. |
 
-## Supported File Formats
+`starcat_web.py` is a streaming version of `starcat.fit_transform()`. Rather than loading the
+whole matrix with `anndata.read_h5ad`, it reads the HDF5 file in row blocks with `h5py`, keeps
+only the genes present in the reference, accumulates per-gene scale factors in one pass and then
+fits usages in batches of 10,000 cells with the package's own `refit_usage()`. Peak memory is
+therefore set by the batch size rather than the dataset size, and results match the full-matrix
+computation to ~1e-6. A 120,000-cell dataset runs in about 20 seconds.
 
-### H5AD Format
-Standard AnnData format for single-cell data stored in HDF5 files.
+Package versions are pinned in `starcat-worker.js`. `anndata` is pinned to 0.11 because newer
+releases depend on `zarr`, which has no WebAssembly wheel; 0.11 reads files written by current
+pandas/anndata releases.
 
-### CellRanger H5 Format
-H5 format output by CellRanger (e.g. filtered_feature_bc_matrix.h5) for users who want to avoid H5Ad
+The list of references shown in the dropdown is read from
+[`current_references.tsv`](https://github.com/immunogenomics/starCAT/blob/main/src/starcat/current_references.tsv)
+in the starCAT repository. When a reference is added there, run `download_references.py` on the
+server so the tarball is available, and bump the `starcatpy` version in the worker if the package
+was released with the new reference.
 
-## Reference Catalogs
-
-Pre-built reference catalogs are available for the following:
-- Human T cells across tissies and diseases (TCAT.V1)
-- Human myeloid cells from gliomas (MYELOID.GLIOMA.V1)
-- Human bone marrow derived CD34+ hematapoetic stem cells (BONEMARROW.CD34POS.HSPC.V1)
-
-View the full catalog at the **References** page.
-
-## Local Development
-
-Since this is a static website, you can run it locally with any web server:
+## Local development
 
 ```bash
-# Using Python 3
-python -m http.server 8000
-
-# Using Node.js http-server
-npx http-server
-
-# Or simply open starcat/index.html in your browser
+python download_references.py          # once: fetch reference tarballs into starcat/references/
+python -m http.server 8000 -d starcat   # then open http://localhost:8000
 ```
+
+The page must be served over HTTP (not opened as a file) because it uses a Web Worker.
+
+## Deployment
+
+The live site is a checkout of this repository on the immunogenomics.io server, symlinked to
+`/var/www/immunogenomics.io/public/starcat`. To deploy, merge to `main`, then on the server
+`git pull` in that checkout and re-run `download_references.py` if references changed.
 
 ## Citation
 
 If you use starCAT in your research, please cite:
 
-```
-Kotliar, D.*, Curtis, M.*, Agnew, R. et al. Reproducible single-cell annotation of programs underlying T cell subsets, activation states and functions. Nat Methods 22, 1964–1980 (2025). https://doi.org/10.1038/s41592-025-02793-1
-```
+> Kotliar D\*, Curtis M\*, Agnew R, et al. Reproducible single-cell annotation of programs
+> underlying T-cell subsets, activation states and functions. *Nature Methods* 22, 1964–1980 (2025).
+> https://doi.org/10.1038/s41592-025-02793-1
 
-## Related Resources
+Please also cite the publication of the reference catalog you used.
 
-- **GitHub** for [starCAT algorithm](https://github.com/immunogenomics/starCAT)
-- **Reference Catalogs**: Available on [Zenodo](https://zenodo.org/communities/starcat/records?q=&l=list&p=1&s=10&sort=newest)
-- **Documentation**: See [manuscript](https://www.nature.com/articles/s41592-025-02793-1#citeas) for methodology details
+## Related resources
+
+- [starCAT Python package](https://github.com/immunogenomics/starCAT) (GitHub), [`starcatpy`](https://pypi.org/project/starcatpy/) on PyPI
+- [Reference catalogs on Zenodo](https://zenodo.org/communities/starcat)
+- [starCAT paper](https://www.nature.com/articles/s41592-025-02793-1)
