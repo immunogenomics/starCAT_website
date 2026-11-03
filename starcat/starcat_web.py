@@ -202,6 +202,34 @@ async def load_reference(ref, base_url, cachedir="/refs"):
 
 
 # ----------------------------------------------------------------------------
+# Summary for the charts on the page (computed here so JS never has to parse
+# the full per-cell table)
+# ----------------------------------------------------------------------------
+
+def summarize(usage_norm, scores):
+    q = usage_norm.quantile([0.05, 0.25, 0.5, 0.75, 0.95]).T
+    q.columns = ["q05", "q25", "q50", "q75", "q95"]
+    q["mean"] = usage_norm.mean()
+    usage = [{"program": str(name), **{k: float(v) for k, v in row.items()}}
+             for name, row in q.iterrows()]
+    labels, binaries, continuous = [], [], []
+    if scores is not None:
+        for col in scores.columns:
+            s = scores[col]
+            if s.dtype == bool or col.endswith("_binary"):
+                flags = s.astype(bool)
+                binaries.append({"name": col.replace("_binary", ""),
+                                 "count": int(flags.sum()), "fraction": float(flags.mean())})
+            elif s.dtype == object or str(s.dtype) == "category" or col.endswith("_Label"):
+                counts = s.astype(str).value_counts()
+                labels.append({"name": col, "counts": [{"label": str(k), "count": int(v)}
+                                                       for k, v in counts.items()]})
+            else:
+                continuous.append({"name": col, "mean": float(s.mean()), "median": float(s.median())})
+    return {"usage": usage, "labels": labels, "binaries": binaries, "continuous": continuous}
+
+
+# ----------------------------------------------------------------------------
 # Pipeline
 # ----------------------------------------------------------------------------
 
@@ -287,6 +315,7 @@ async def run(data_path, file_type, ref, ref_base):
         "n_genes_overlap": int(len(keep)),
         "n_genes_reference": int(n_ref),
         "matrix_used": matrix_used,
+        "summary": summarize(cat.usage_norm, cat.scores),
         "warnings": list(_warnings),
         "seconds": round(time.time() - t_start, 1),
     }
